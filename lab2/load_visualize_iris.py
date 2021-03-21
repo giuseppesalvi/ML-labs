@@ -35,9 +35,9 @@ def plot_histogram(D, L):
     plt.rc('ytick', labelsize=16)
 
     # let's filter only the data corrisponging to each class
-    D0 = D[:, labels == 0]
-    D1 = D[:, labels == 1]
-    D2 = D[:, labels == 2]
+    D0 = D[:, L == 0]
+    D1 = D[:, L == 1]
+    D2 = D[:, L == 2]
 
     attributes = {
         0: 'Sepal lenght',
@@ -95,3 +95,5 @@ if __name__ == '__main__':
     data, labels = load("iris.csv")
     plot_histogram(data, labels)
     plot_scatter(data, labels)
+    mu = data.mean(1)
+    centered_data = data - mu.reshape((data.shape[0], 1))
