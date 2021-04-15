@@ -63,6 +63,7 @@ if __name__ == "__main__":
     # Split dataset in training set and test set
     (DTR, LTR), (DTE, LTE) = split_db_2to1(D, L)
 
+    # Compute the ML estimates for the classifier parameters
     DTR0 = DTR[:, LTR == 0]
     DTR1 = DTR[:, LTR == 1]
     DTR2 = DTR[:, LTR == 2]
@@ -73,4 +74,5 @@ if __name__ == "__main__":
     C1 = covariance_matrix2(DTR1)
     mu2 = DTR2.mean(1)
     C2 = covariance_matrix2(DTR2)
+
 
