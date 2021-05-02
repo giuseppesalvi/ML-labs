@@ -62,8 +62,8 @@ def vcol(x):
 
 # FROM LAB 4
 def logpdf_GAU_ND(x, mu, C):
-    """Computes the Multivariate Gaussian log density for the dataset x
-       C represents the covariance matrix sigma
+    """ Computes the Multivariate Gaussian log density for the dataset x
+        C represents the covariance matrix sigma
     """
     # M is the number of rows of x, n of attributes for each sample
     M = x.shape[0]
@@ -115,15 +115,6 @@ def multivariate_gaussian_classifier(DTR, LTR, DTE, LTE):
     # posterior probability, (argmax is used for that)
     predictions = SPost.argmax(axis=0)
 
-    # Print Results
-    print("MULTIVARIATE GAUSSIAN CLASSIFIER: ")
-
-    # Print predicted labels, truth of the prediction, correct label if false
-    print("\nPREDICTED LABELS:")
-    for i, pred in enumerate(predictions):
-        print("predicted: " + str(pred), pred == LTE[i],
-              "" if pred == LTE[i] else "correct: " + str(LTE[i]))
-
     # correct predictions, wrong predictions
     predicted = (predictions == LTE).sum()
     not_predicted = predictions.size - predicted
@@ -132,10 +123,10 @@ def multivariate_gaussian_classifier(DTR, LTR, DTE, LTE):
     acc = predicted / predictions.size
     err = not_predicted / predictions.size
 
-    print("\nCORRECT PREDICTIONS : ", predicted)
-    print("\nWRONG PREDICTIONS : ", not_predicted)
-    print("\nACCURACY : ", acc)
-    print("\nERROR RATE : ", err, "\n")
+    # Print Results
+    t = "MULTIVARIATE GAUSSIAN CLASSIFIER: \n"
+    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+    return
 
 
 def multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE):
@@ -180,15 +171,98 @@ def multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE):
     # posterior probability, (argmax is used for that)
     predictions = SPost.argmax(axis=0)
 
+    # correct predictions, wrong predictions
+    predicted = (predictions == LTE).sum()
+    not_predicted = predictions.size - predicted
+
+    # accuracy, error rate
+    acc = predicted / predictions.size
+    err = not_predicted / predictions.size
+
     # Print Results
-    print("MULTIVARIATE GAUSSIAN CLASSIFIER: ")
-    print("(IMPLEMENTATION WITH LOG-DENSITIES)")
+    t = "MULTIVARIATE GAUSSIAN CLASSIFIER: \n" + \
+        "(IMPLEMENTATION WITH LOG-DENSITIES)"
+    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+
+    return
+
+
+def print_results(title, predictions, LTE, n_correct, n_wrong, acc, err):
+    """ Prints the predicted labels, the number of correct predictions,
+        the number of wrong predictions, the accuracy and the error rate
+    """
+    # Print Title
+    print("-----------------------------------------------------------")
+    print(title)
+    print("-----------------------------------------------------------")
 
     # Print predicted labels, truth of the prediction, correct label if false
-    print("\nPREDICTED LABELS:")
+    print("PREDICTED LABELS:")
     for i, pred in enumerate(predictions):
         print("predicted: " + str(pred), pred == LTE[i],
               "" if pred == LTE[i] else "correct: " + str(LTE[i]))
+
+    # Print number of correct and wrong predictions
+    print("\nCORRECT PREDICTIONS : ", n_correct, "\n")
+    print("WRONG PREDICTIONS : ", n_wrong, "\n")
+
+    # Print accuracy and error rate
+    print("ACCURACY : ", acc,  "\n")
+    print("ERROR RATE : ", err)
+    print("-----------------------------------------------------------\n\n")
+
+    return
+
+
+def naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE):
+    """ implementation of the  Naive Bayes Gaussian Classifier
+        based on MVG version with log_densities,
+        covariance matrixes are diagonal
+        DTR and LTR are training data and labels
+        DTE and LTE are evaluation data and labels
+    """
+    # Compute the ML estimates for the classifier parameters
+    DTR0 = DTR[:, LTR == 0]
+    DTR1 = DTR[:, LTR == 1]
+    DTR2 = DTR[:, LTR == 2]
+
+    mu0 = DTR0.mean(1)
+    C0 = covariance_matrix2(DTR0)
+    mu1 = DTR1.mean(1)
+    C1 = covariance_matrix2(DTR1)
+    mu2 = DTR2.mean(1)
+    C2 = covariance_matrix2(DTR2)
+
+    # We need to zeroing the out of diagonal elements of the MVG ML solution
+    # This can be done multiplying element-wise the MVG ML solution
+    # with the identity matrix
+    C0 *= np.identity(C0.shape[0])
+    C1 *= np.identity(C1.shape[0])
+    C2 *= np.identity(C2.shape[0])
+
+    # Compute for each test sample the likelihoods
+    # Initialize the score matrix, S[i,j] contains the
+    # class conditional probability for sample j given class i
+    S = np.zeros((3, DTE.shape[1]))
+    for j, sample in enumerate(DTE.T):
+        sample = vcol(sample)
+        S[0, j] = logpdf_GAU_ND(sample, vcol(mu0), C0)
+    for j, sample in enumerate(DTE.T):
+        sample = vcol(sample)
+        S[1, j] = logpdf_GAU_ND(sample, vcol(mu1), C1)
+    for j, sample in enumerate(DTE.T):
+        sample = vcol(sample)
+        S[2, j] = logpdf_GAU_ND(sample, vcol(mu2), C2)
+
+    # Compute class posterior probabilities combining the score matrix with
+    # prior information, in this case P(c) = 1/3 for every class
+    SJoint = np.log(1/3) + S
+    SPost = SJoint - sp.special.logsumexp(SJoint, axis=0)
+
+    # SPost is the array of class posterior probabilities
+    # The predicted label is obtained as the class that has maximum
+    # posterior probability, (argmax is used for that)
+    predictions = SPost.argmax(axis=0)
 
     # correct predictions, wrong predictions
     predicted = (predictions == LTE).sum()
@@ -198,10 +272,88 @@ def multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE):
     acc = predicted / predictions.size
     err = not_predicted / predictions.size
 
-    print("\nCORRECT PREDICTIONS : ", predicted)
-    print("\nWRONG PREDICTIONS : ", not_predicted)
-    print("\nACCURACY : ", acc)
-    print("\nERROR RATE : ", err, "\n")
+    # Print Results
+    t = "NAIVE BAYES GAUSSIAN CLASSIFIER"
+    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+
+    return
+
+
+# FROM LAB 3
+def within_class_covariance_matrix(DTR, LTR):
+    """ computes the within class covariance matrix SW for the dataset D"""
+
+    # select the samples of the i-th class
+    # in the IRIS dataset classes are labeled as 0, 1, 2
+    DTR0 = DTR[:, LTR == 0]
+    DTR1 = DTR[:, LTR == 1]
+    DTR2 = DTR[:, LTR == 2]
+
+    # to compute the within class covariance matrix, we have to sum
+    # the covariance matrices of each class
+    C0 = covariance_matrix2(DTR0)
+    C1 = covariance_matrix2(DTR1)
+    C2 = covariance_matrix2(DTR2)
+    SW = (DTR0.shape[1] * C0 +
+          DTR1.shape[1] * C1 +
+          DTR2.shape[1] * C2) / DTR.shape[1]
+    return SW
+
+
+def tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE):
+    """ implementation of the Tied Covariance Gaussian Classifier
+        based on MVG version with log_densities
+        DTR and LTR are training data and labels
+        DTE and LTE are evaluation data and labels
+    """
+    # Compute the ML estimates for the classifier parameters
+    DTR0 = DTR[:, LTR == 0]
+    DTR1 = DTR[:, LTR == 1]
+    DTR2 = DTR[:, LTR == 2]
+
+    mu0 = DTR0.mean(1)
+    mu1 = DTR1.mean(1)
+    mu2 = DTR2.mean(1)
+
+    C_star = within_class_covariance_matrix(DTR, LTR)
+
+    # Compute for each test sample the likelihoods
+    # Initialize the score matrix, S[i,j] contains the
+    # class conditional probability for sample j given class i
+    S = np.zeros((3, DTE.shape[1]))
+    for j, sample in enumerate(DTE.T):
+        sample = vcol(sample)
+        S[0, j] = logpdf_GAU_ND(sample, vcol(mu0), C_star)
+    for j, sample in enumerate(DTE.T):
+        sample = vcol(sample)
+        S[1, j] = logpdf_GAU_ND(sample, vcol(mu1), C_star)
+    for j, sample in enumerate(DTE.T):
+        sample = vcol(sample)
+        S[2, j] = logpdf_GAU_ND(sample, vcol(mu2), C_star)
+
+    # Compute class posterior probabilities combining the score matrix with
+    # prior information, in this case P(c) = 1/3 for every class
+    SJoint = np.log(1/3) + S
+    SPost = SJoint - sp.special.logsumexp(SJoint, axis=0)
+
+    # SPost is the array of class posterior probabilities
+    # The predicted label is obtained as the class that has maximum
+    # posterior probability, (argmax is used for that)
+    predictions = SPost.argmax(axis=0)
+
+    # correct predictions, wrong predictions
+    predicted = (predictions == LTE).sum()
+    not_predicted = predictions.size - predicted
+
+    # accuracy, error rate
+    acc = predicted / predictions.size
+    err = not_predicted / predictions.size
+
+    # Print Results
+    t = "TIED COVARIANCE GAUSSIAN CLASSIFIER: "
+    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+
+    return
 
 
 if __name__ == "__main__":
@@ -217,3 +369,9 @@ if __name__ == "__main__":
 
     # Multivariate Gaussian Classifier (MVG), implementation with log-densities
     multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE)
+
+    # Naive Bayes Gaussian Classifier
+    naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE)
+
+    # Tied Covariance Gaussian Classifier
+    tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE)
