@@ -6,10 +6,11 @@ import scipy as sp
 def load_iris():
     """ Load iris dataset from the sklearn library
         Returns the dataset matrix D and matrix of labels L
-        We need to transpose the data matrix, since we work with column
-        representations of feature vectors
     """
+    # We need to transpose the data matrix, since we work with column
+    # representations of feature vectors
     D, L = da.load_iris()['data'].T, da.load_iris()['target']
+
     return D, L
 
 
@@ -44,19 +45,23 @@ def covariance_matrix2(D):
     """
     # compute the dataset mean mu
     mu = D.mean(1)
+
     # mu is a 1-D array, we need to reshape it to a column vector
-    mu = mu.reshape((mu.size, 1))
-    # print(mu)
+    mu = vcol(mu)
+
     # remove the mean from all the points
     DC = D - mu
+
     # DC is the matrix of centered data
     C = np.dot(DC, DC.T)
     C = C / float(D.shape[1])
-    # print(C)
+
     return C
 
 
 def vcol(x):
+    """ reshape the vector x into a column vector """
+
     return x.reshape(x.shape[0], 1)
 
 
@@ -71,13 +76,17 @@ def logpdf_GAU_ND(x, mu, C):
     second = -0.5 * np.linalg.slogdet(C)[1]
     third = -0.5 * np.dot(
         np.dot((x-mu).T, np.linalg.inv(C)), (x - mu))
+
     return np.diag(first+second+third)
 
 
-def multivariate_gaussian_classifier(DTR, LTR, DTE, LTE):
+def multivariate_gaussian_classifier(DTR, LTR, DTE, LTE, print_flag=False):
     """ implementation of the  Multivariate Gaussian Classifier
         DTR and LTR are training data and labels
         DTE and LTE are evaluation data and labels
+        print_flag = True to print results, false otherwise
+        returns: the predicitons, the number of correct predictions,
+            the number of wrong predictions, the accuracy and the error rate
     """
     # Compute the ML estimates for the classifier parameters
     DTR0 = DTR[:, LTR == 0]
@@ -124,16 +133,21 @@ def multivariate_gaussian_classifier(DTR, LTR, DTE, LTE):
     err = not_predicted / predictions.size
 
     # Print Results
-    t = "MULTIVARIATE GAUSSIAN CLASSIFIER: \n"
-    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
-    return
+    if(print_flag):
+        t = "MULTIVARIATE GAUSSIAN CLASSIFIER: \n"
+        print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+
+    return predictions, predicted, not_predicted, acc, err
 
 
-def multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE):
+def multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE, print_flag=False):
     """ implementation of the  Multivariate Gaussian Classifier
         using log_densities
         DTR and LTR are training data and labels
         DTE and LTE are evaluation data and labels
+        print_flag = True to print results, false otherwise
+        returns: the predicitons, the number of correct predictions,
+            the number of wrong predictions, the accuracy and the error rate
     """
     # Compute the ML estimates for the classifier parameters
     DTR0 = DTR[:, LTR == 0]
@@ -180,11 +194,12 @@ def multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE):
     err = not_predicted / predictions.size
 
     # Print Results
-    t = "MULTIVARIATE GAUSSIAN CLASSIFIER: \n" + \
-        "(IMPLEMENTATION WITH LOG-DENSITIES)"
-    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+    if(print_flag):
+        t = "MULTIVARIATE GAUSSIAN CLASSIFIER: \n" + \
+            "(IMPLEMENTATION WITH LOG-DENSITIES)"
+        print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
 
-    return
+    return predictions, predicted, not_predicted, acc, err
 
 
 def print_results(title, predictions, LTE, n_correct, n_wrong, acc, err):
@@ -214,12 +229,15 @@ def print_results(title, predictions, LTE, n_correct, n_wrong, acc, err):
     return
 
 
-def naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE):
+def naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE, print_flag=False):
     """ implementation of the  Naive Bayes Gaussian Classifier
         based on MVG version with log_densities,
         covariance matrixes are diagonal
         DTR and LTR are training data and labels
         DTE and LTE are evaluation data and labels
+        print_flag = True to print results, false otherwise
+        returns: the predicitons, the number of correct predictions,
+            the number of wrong predictions, the accuracy and the error rate
     """
     # Compute the ML estimates for the classifier parameters
     DTR0 = DTR[:, LTR == 0]
@@ -273,10 +291,11 @@ def naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE):
     err = not_predicted / predictions.size
 
     # Print Results
-    t = "NAIVE BAYES GAUSSIAN CLASSIFIER"
-    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+    if(print_flag):
+        t = "NAIVE BAYES GAUSSIAN CLASSIFIER"
+        print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
 
-    return
+    return predictions, predicted, not_predicted, acc, err
 
 
 # FROM LAB 3
@@ -300,11 +319,14 @@ def within_class_covariance_matrix(DTR, LTR):
     return SW
 
 
-def tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE):
+def tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE, print_flag=False):
     """ implementation of the Tied Covariance Gaussian Classifier
         based on MVG version with log_densities
         DTR and LTR are training data and labels
         DTE and LTE are evaluation data and labels
+        print_flag = True to print results, false otherwise
+        returns: the predicitons, the number of correct predictions,
+            the number of wrong predictions, the accuracy and the error rate
     """
     # Compute the ML estimates for the classifier parameters
     DTR0 = DTR[:, LTR == 0]
@@ -350,8 +372,80 @@ def tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE):
     err = not_predicted / predictions.size
 
     # Print Results
-    t = "TIED COVARIANCE GAUSSIAN CLASSIFIER: "
-    print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+    if(print_flag):
+        t = "TIED COVARIANCE GAUSSIAN CLASSIFIER: "
+        print_results(t, predictions, LTE, predicted, not_predicted, acc, err)
+
+    return predictions, predicted, not_predicted, acc, err
+
+
+def k_fold(D, L, K, seed=0):
+    """ implementation of the k-fold cross validation approach
+        D is the dataset, L the labels, K the number of folds
+        it prints out the results
+    """
+    sizePartitions = int(D.shape[1]/K)
+    np.random.seed(seed)
+
+    # permutate the indexes of the samples
+    idx_permutation = np.random.permutation(D.shape[1])
+
+    # put the indexes inside different partitions
+    idx_partitions = []
+    for i in range(0, D.shape[1], sizePartitions):
+        idx_partitions.append(list(idx_permutation[i:i+sizePartitions]))
+    error_rates = {'MVG': 0.0, 'NAIVE': 0.0, 'TIED': 0.0}
+    accuracies = {'MVG': 0.0, 'NAIVE': 0.0, 'TIED': 0.0}
+
+    # for each fold, consider the ith partition in the test set
+    # the other partitions in the train set
+    for i in range(K):
+        # keep the i-th partition for test
+        # keep the other partitions for train
+        idx_test = idx_partitions[i]
+        idx_train = idx_partitions[0:i] + idx_partitions[i+1:]
+
+        # from lists of lists collapse the elemnts in a single list
+        idx_train = sum(idx_train, [])
+
+        # partition the data and labels using the already partitioned indexes
+        DTR = D[:, idx_train]
+        DTE = D[:, idx_test]
+        LTR = L[idx_train]
+        LTE = L[idx_test]
+
+        # Multivariate Gaussian Classifier
+        _, _, _,\
+            acc, err = multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE)
+        accuracies['MVG'] += acc / K
+        error_rates['MVG'] += err / K
+
+        # Naive Bayes Gaussian Classifier
+        _, _, _,\
+            acc, err = naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE)
+        accuracies['NAIVE'] += acc / K
+        error_rates['NAIVE'] += err / K
+
+        # Tied Covariance Gaussian Classifier
+        _, _, _,\
+            acc, err = tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE)
+        accuracies['TIED'] += acc / K
+        error_rates['TIED'] += err / K
+
+    print("-----------------------------------------------------------")
+    print("K-FOLD Cross Validation, K =", K)
+    print("-----------------------------------------------------------")
+    print("RESULTS:")
+    print("Multivariate Gaussian Classifier",
+          "accuracy: ", accuracies['MVG'] * 100, "% ",
+          "error rate:", error_rates['MVG'] * 100, "%")
+    print("Naive Bayes Gaussian Classifier",
+          "accuracy: ", accuracies['NAIVE'] * 100, "% ",
+          "error rate:", error_rates['NAIVE'] * 100, "%")
+    print("Tied Covariance Gaussian Classifier",
+          "accuracy: ", accuracies['TIED'] * 100, "% ",
+          "error rate:", error_rates['TIED'] * 100, "%")
+    print("-----------------------------------------------------------\n\n")
 
     return
 
@@ -365,13 +459,16 @@ if __name__ == "__main__":
     (DTR, LTR), (DTE, LTE) = split_db_2to1(D, L)
 
     # Multivariate Gaussian Classifier (MVG)
-    multivariate_gaussian_classifier(DTR, LTR, DTE, LTE)
+    multivariate_gaussian_classifier(DTR, LTR, DTE, LTE, print_flag=True)
 
     # Multivariate Gaussian Classifier (MVG), implementation with log-densities
-    multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE)
+    multivariate_gaussian_classifier2(DTR, LTR, DTE, LTE, print_flag=True)
 
     # Naive Bayes Gaussian Classifier
-    naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE)
+    naive_bayes_gaussian_classifier(DTR, LTR, DTE, LTE, print_flag=True)
 
     # Tied Covariance Gaussian Classifier
-    tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE)
+    tied_covariance_gaussian_classifier(DTR, LTR, DTE, LTE, print_flag=True)
+
+    # K-Fold
+    k_fold(D, L, 150)
