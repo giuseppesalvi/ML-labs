@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 
 
 def load_data():
@@ -42,7 +43,7 @@ def train_model(tercets, eps=0.1):
     # Build dictionary of all possible words
     all_tercets = tercets['inferno'] + \
         tercets['purgatorio'] + tercets['paradiso']
-    model = build_dictionary(all_tercets)
+    words_dict = build_dictionary(all_tercets)
     #
     # Build a dictionary for each class from the dictionary with all words
     # and initialize the values to eps
@@ -82,9 +83,12 @@ def train_model(tercets, eps=0.1):
     for word in paradiso_dict:
         paradiso_dict[word] = np.log(
             paradiso_dict[word]) - np.log(n_words_paradiso)
-    
+
     # Return the three dictionaries inside a dictionary with labels as keys
-    return {'inferno': inferno_dict, 'purgatorio': purgatorio_dict, 'paradiso': inferno_dict}
+    result = {'inferno': inferno_dict,
+              'purgatorio': purgatorio_dict,
+              'paradiso': inferno_dict}
+    return result
 
 
 def build_dictionary(tercets):
@@ -100,6 +104,71 @@ def build_dictionary(tercets):
             else:
                 words_dict[word] += 1
     return words_dict
+
+
+def compute_score_matrix(model, tercets):
+    """ Computes the score matrix S for each class, given the tercets
+        model is a dictionary conatining the model parameters, as returned
+        by train_model() 
+        tercets are the tercets for evaluation 
+    """
+    # Initialize a matrix of size N_classes * N_tercets with zeros
+    # Each row corresponds to a class and each column to a test sample (tercet)
+    S = np.zeros(len(model), len(tercets))
+    for i, tercet in enumerate(tercets):
+        scores = compute_log_likelihoods(model, tercet)
+        # inferno: first row of the score matrix
+        S[0][i] = scores['inferno']
+        # purgatorio: second row of the score matrix
+        S[1][i] = scores['purgatorio']
+        # paradiso: third row of the score matrix
+        S[2][i] = scores['paradiso']
+
+    return S
+
+
+def compute_log_likelihoods(model, text):
+    '''
+    Compute the array of log-likelihoods for each class for the given text
+    model is the dictionary of model parameters as returned by train_model()
+    The function returns a dictionary of class-conditional log-likelihoods
+    '''
+    log_likelihoods = {'inferno': 0, 'purgatorio': 0, 'paradiso': 0}
+
+    # for each word in the text
+    for word in text.split():
+        if word in model['inferno']:
+            log_likelihoods['inferno'] += model['inferno'][word]
+        if word in model['purgatorio']:
+            log_likelihoods['purgatorio'] += model['purgatorio'][word]
+        if word in model['paradiso']:
+            log_likelihoods['paradiso'] += model['paradiso'][word]
+
+    return log_likelihoods
+
+
+def mcol(v):
+    return v.reshape((v.size, 1))
+
+
+def compute_class_posteriors(S, log_prior=None):
+    ''' Compute class posterior probabilities
+        S: Score Matrix of class-conditional log-likelihoods
+        log_prior: array with class prior probability 
+        Returns: matrix of class posterior probabilities
+    '''
+    # If log_prior is non, uniform priors will be used
+    if log_prior is None:
+        logPrior = numpy.log(numpy.ones(S.shape[0]) / float(S.shape[0]))
+
+    # Compute Joint probability
+    SJoint = S + mcol(log_prior)
+
+    # Compute the array of class posterior log_probabilities
+    # Subtract marginal likelihood
+    SPost = SJoint - sp.special.logsumexp(SJoint, axis=0)
+
+    return np.exp(SPost)
 
 
 if __name__ == "__main__":
@@ -127,3 +196,34 @@ if __name__ == "__main__":
     model = train_model(tercets_train, eps=0.001)
 
     # Predicting the criteria
+
+    # Score matrix
+    S = compute_score_matrix(model, tercets_test)
+
+    # Class posterior probabilities
+    SPost = compute_class_posteriors(
+        S, np.log(np.array([1./3., 1./3., 1./3.])))
+
+    #TODO
+    # labelsInf = numpy.zeros(len(lInfEval))
+    # labelsInf[:] = hCls2Idx['inferno# 
+    # labelsPar = numpy.zeros(len(lParEval))
+    # labelsPar[:] = hCls2Idx['paradiso# 
+    # labelsPur = numpy.zeros(len(lPurEval))
+    # labelsPur[:] = hCls2Idx['purgatorio# 
+    # labels_test= np.hstack([labelsInf, labelsPur, labelsPar])
+    
+    # 1 Task:
+    # Closed-set multiclass classification:
+
+    # The predicted label is obtained as the class that has maximum
+    # posterior probability, (argmax is used for that
+    predictions = SPost.argmax(axis=0)
+
+    # Correct predictions, wrong predictions
+    correct = (predictions.ravel() == L.ravel()).sum()
+    wrong = predictions.size - correct
+    
+    # Accuracy, Error Rate
+    accuracy = correct / predictions.size
+    error_rate = wrong / predictions.size
