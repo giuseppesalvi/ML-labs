@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.lib.scimath import log
 from modules import gaussian_models as gm
 from modules import generative_models_text_classification as gmtx
 
@@ -42,9 +43,33 @@ def print_confusion_matrix(confusion_matrix, n_classes):
     return
 
 
+def optimal_bayes_decisions(llr, pi1, Cfn, Cfp):
+    """ Computes optimal Bayes decisions starting from the binary 
+        log-likelihoods ratios
+        llr is the array of log-likelihoods ratios
+        pi1 is the prior class probability of class 1 (True)
+        Cfp = C1,0 is the cost of false positive errors, that is the cost of 
+        predicting class 1 (True) when the actual class is 0 (False)
+        Cfn = C0,1 is the cost of false negative errors that is the cost of 
+        predicting class 0 (False) when the actual class is 1 (True)
+    """
+
+    # initialize an empty array for predictions of samples
+    predictions = np.empty(llr.shape, int)
+
+    # compare the log-likelihood ratio with threshold to predict the class
+    threshold = - log((pi1 * Cfn) / ((1 - pi1) * Cfp))
+    for i in range(llr.size):
+        if llr[i] > threshold:
+            predictions[i] = 1
+        else:
+            predictions[i] = 0
+    return predictions
+
+
 if __name__ == "__main__":
 
-    # Confusion matrices and accuracy
+    # 1. Confusion matrices and accuracy
 
     # IRIS Dataset
 
@@ -91,3 +116,37 @@ if __name__ == "__main__":
     # Compute the confusion matrix for the predictions on Divina Commedia
     print("\nConfusion matrix for the predictions on divina commedia\n")
     conf_commedia = confusion_matrix(predictions_commedia, labels_commedia, 3)
+
+    # 2. Binary taks: optimal Bayes decisions
+
+    # Load log-likelihood ratios for the inferno-vs-paradiso task
+    llr_infpar = np.load("data/commedia_llr_infpar.npy")
+
+    # Load the corresponding labels
+    labels_infpar = np.load("data/commedia_labels_infpar.npy")
+    
+    # Compute optimal Bayes decisions for the binary task inferno-vs-paradiso
+    # And print the confusion matrix 
+    print("\nConfusion matrix for the predictions using optimal Bayes decisions\n")
+
+    # pi1 = 0.5, Cfn = 1, Cfp = 1
+    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.5, 1, 1)
+    print("\npi1 = 0.5, Cfn = 1, Cfp = 1\n")
+    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+
+    # pi1 = 0.8, Cfn = 1, Cfp = 1
+    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.8, 1, 1)
+    print("\npi1 = 0.8, Cfn = 1, Cfp = 1\n")
+    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+
+    # pi1 = 0.5, Cfn = 10, Cfp = 1
+    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.5, 10, 1)
+    print("\npi1 = 0.5, Cfn = 10, Cfp = 1\n")
+    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+
+    # pi1 = 0.8, Cfn = 1, Cfp = 10
+    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.8, 1, 10)
+    print("\npi1 = 0.8, Cfn = 1, Cfp = 10\n")
+    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+
+
