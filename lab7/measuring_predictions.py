@@ -45,7 +45,7 @@ def print_confusion_matrix(confusion_matrix, n_classes):
     return
 
 
-def optimal_bayes_decisions(llr, pi1, Cfn, Cfp):
+def optimal_bayes_decisions(llr, pi1, Cfn, Cfp, threshold=None):
     """ Computes optimal Bayes decisions starting from the binary 
         log-likelihoods ratios
         llr is the array of log-likelihoods ratios
@@ -60,7 +60,9 @@ def optimal_bayes_decisions(llr, pi1, Cfn, Cfp):
     predictions = np.empty(llr.shape, int)
 
     # compare the log-likelihood ratio with threshold to predict the class
-    threshold = - log((pi1 * Cfn) / ((1 - pi1) * Cfp))
+    # if the threshold is not specified use the theoretical optimal threshold
+    if (threshold == None):
+        threshold = - log((pi1 * Cfn) / ((1 - pi1) * Cfp))
     for i in range(llr.size):
         if llr[i] > threshold:
             predictions[i] = 1
@@ -119,15 +121,8 @@ def minimum_detection_costs(llr, labels, pi1, Cfn, Cfp):
 
     min_DCF = np.inf
     for t in thresholds:
-        # initialize an empty array for predictions of samples
-        predictions = np.empty(llr.shape, int)
-
         # compare the log-likelihood ratio with threshold to predict the class
-        for i in range(llr.size):
-            if llr[i] > t:
-                predictions[i] = 1
-            else:
-                predictions[i] = 0
+        predictions = optimal_bayes_decisions(llr, pi1, Cfn, Cfp, t)
 
         # compute the confusion matrix
         conf = confusion_matrix(predictions, labels, 2, False)
@@ -183,7 +178,7 @@ def plot_ROC(llr, labels):
             (conf[0][0] + conf[1][0])
 
         # Add results to the arrays
-        FPRs[j] = FPR 
+        FPRs[j] = FPR
         TPRs[j] = TPR
 
     # Plot the ROC, on x-axis all the FPRs, on y-asis all the TPRs
@@ -193,7 +188,33 @@ def plot_ROC(llr, labels):
     plt.plot(FPRs, TPRs)
     plt.show()
     return
-   
+
+
+def bayes_error_plots(llr, labels, eff_prior_log_odds):
+    """ Plot the normalized costs as a fuction of an effective prior pi_tilde """
+    DCFs = np.empty(eff_prior_log_odds.size)
+    min_DCFs = np.empty(eff_prior_log_odds.size)
+
+    for j, p in enumerate(eff_prior_log_odds):
+        pi_tilde = 1 / (1 + np.exp(-p))
+        predictions_bayes = optimal_bayes_decisions(llr, pi_tilde, 1, 1, -p)
+        # equivalent: predictions_bayes = optimal_bayes_decisions(llr, pi_tilde, 1, 1)
+        conf = confusion_matrix(predictions_bayes, labels, 2, False)
+        DCF = empirical_bayes_risk(conf, pi_tilde, 1, 1)
+        DCF_norm = normalized_detection_cost(DCF, pi_tilde, 1, 1)
+        DCF_min = minimum_detection_costs(llr, labels, pi_tilde, 1, 1)
+        DCFs[j] = DCF_norm
+        min_DCFs[j] = DCF_min
+
+    plt.figure()
+    plt.plot(eff_prior_log_odds, DCFs, label="DCF", color="r")
+    plt.plot(eff_prior_log_odds, min_DCFs, label="min DCF", color="b")
+    plt.ylim([0, 1.1])
+    plt.xlim([-3, 3])
+    plt.show()
+    return
+
+
 if __name__ == "__main__":
 
     # 1. Confusion matrices and accuracy
@@ -321,3 +342,7 @@ if __name__ == "__main__":
 
     # 5. ROC curves
     plot_ROC(llr_infpar, labels_infpar)
+
+    # 6. Bayes error plots
+    eff_prior_log_odds = np.linspace(-3, 3, 21)
+    bayes_error_plots(llr_infpar, labels_infpar, eff_prior_log_odds)
