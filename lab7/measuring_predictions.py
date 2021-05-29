@@ -4,7 +4,7 @@ from modules import gaussian_models as gm
 from modules import generative_models_text_classification as gmtx
 
 
-def confusion_matrix(predicted_labels, real_labels, K):
+def confusion_matrix(predicted_labels, real_labels, K, print_flag=True):
     """ Computes the confusion matrix given the predicted labels and
         the real labels
         K is the size of the matrix (K x K)
@@ -18,7 +18,8 @@ def confusion_matrix(predicted_labels, real_labels, K):
         conf_matrix[predicted_labels[i]][real_labels[i]] += 1
 
     # Print the confusion matrix
-    print_confusion_matrix(conf_matrix, K)
+    if print_flag:
+        print_confusion_matrix(conf_matrix, K)
 
     return conf_matrix
 
@@ -101,6 +102,44 @@ def normalized_detection_cost(DCF, pi1, Cfn, Cfp):
     DCFdummy = pi1 * Cfn if (pi1 * Cfn < (1-pi1) * Cfp) else (1-pi1) * Cfp
 
     return DCF / DCFdummy
+
+
+def minimum_detection_costs(llr, labels, pi1, Cfn, Cfp):
+    """ Compute the minimum detection cost, given the binary
+        log likelihood ratios llr
+        labels is the array of labels
+        pi1, Cfn, Cfp are the parameters for the application
+    """
+
+    # consider a set of thresholds corresponding to (-inf, s1, ... , sM, inf)
+    # where s1 ... sM are the test scores, sorted in increasing order
+    thresholds = np.append(llr, [np.inf, -np.inf])
+    thresholds.sort()
+
+    min_DCF = np.inf
+    for t in thresholds:
+        # initialize an empty array for predictions of samples
+        predictions = np.empty(llr.shape, int)
+
+        # compare the log-likelihood ratio with threshold to predict the class
+        for i in range(llr.size):
+            if llr[i] > t:
+                predictions[i] = 1
+            else:
+                predictions[i] = 0
+
+        # compute the confusion matrix
+        conf = confusion_matrix(predictions, labels, 2, False)
+
+        # compute DCF_norm
+        DCF = empirical_bayes_risk(conf, pi1, Cfn, Cfp)
+        DCF_norm = normalized_detection_cost(DCF, pi1, Cfn, Cfp)
+
+        # set DCF as minimum if true
+        if DCF_norm < min_DCF:
+            min_DCF = DCF_norm
+
+    return min_DCF
 
 
 if __name__ == "__main__":
@@ -212,3 +251,19 @@ if __name__ == "__main__":
     print("(0.8, 1, 1)\t%.3f" % (DCF2_norm))
     print("(0.5, 10, 1)\t%.3f" % (DCF3_norm))
     print("(0.8, 1, 10)\t%.3f" % (DCF4_norm))
+
+    # 4. Minimum detection costs
+
+    DCF1_min = minimum_detection_costs(llr_infpar, labels_infpar, 0.5, 1, 1)
+    DCF2_min = minimum_detection_costs(llr_infpar, labels_infpar, 0.8, 1, 1)
+    DCF3_min = minimum_detection_costs(llr_infpar, labels_infpar, 0.5, 10, 1)
+    DCF4_min = minimum_detection_costs(llr_infpar, labels_infpar, 0.8, 1, 10)
+
+    print("\nMinimum detection Costs\n")
+    print("(pi1, Cfn, Cfp)\tmin DCF")
+    print("-------------------------")
+    print("(0.5, 1, 1)\t%.3f" % (DCF1_min))
+    print("(0.8, 1, 1)\t%.3f" % (DCF2_min))
+    print("(0.5, 10, 1)\t%.3f" % (DCF3_min))
+    print("(0.8, 1, 10)\t%.3f" % (DCF4_min))
+
