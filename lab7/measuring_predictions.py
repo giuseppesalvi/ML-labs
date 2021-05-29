@@ -67,6 +67,42 @@ def optimal_bayes_decisions(llr, pi1, Cfn, Cfp):
     return predictions
 
 
+def empirical_bayes_risk(confusion_matrix, pi1, Cfn, Cfp):
+    """ Computes the Bayes risk (or detection cost) from the consufion matrix 
+        corresponding to the optimal decisions for an 
+        application (pi1, Cfn, Cfp)
+    """
+
+    # FNR = false negative rate
+    FNR = confusion_matrix[0][1] / \
+        (confusion_matrix[0][1] + confusion_matrix[1][1])
+
+    # FPR = false positive rate
+    FPR = confusion_matrix[1][0] / \
+        (confusion_matrix[0][0] + confusion_matrix[1][0])
+
+    # We can compute the empirical bayes risk, or detection cost function DCF
+    # using this formula
+    DCF = pi1 * Cfn * FNR + (1-pi1) * Cfp * FPR
+
+    return DCF
+
+
+def normalized_detection_cost(DCF, pi1, Cfn, Cfp):
+    """ Computes the normalized detection cost, given the detection cost DCF,
+        and the parameters of the application, pi1, Cfn, Cfp
+    """
+
+    # We can compute the normalized detection cost (or bayes risk)
+    # by dividing the bayes risk by the risk of an optimal system that doen not
+    # use the test data at all
+
+    # The cost of such system is given by this formula
+    DCFdummy = pi1 * Cfn if (pi1 * Cfn < (1-pi1) * Cfp) else (1-pi1) * Cfp
+
+    return DCF / DCFdummy
+
+
 if __name__ == "__main__":
 
     # 1. Confusion matrices and accuracy
@@ -124,29 +160,55 @@ if __name__ == "__main__":
 
     # Load the corresponding labels
     labels_infpar = np.load("data/commedia_labels_infpar.npy")
-    
+
     # Compute optimal Bayes decisions for the binary task inferno-vs-paradiso
-    # And print the confusion matrix 
+    # And print the confusion matrix for different parameters
     print("\nConfusion matrix for the predictions using optimal Bayes decisions\n")
 
     # pi1 = 0.5, Cfn = 1, Cfp = 1
-    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.5, 1, 1)
+    predictions_bayes1 = optimal_bayes_decisions(llr_infpar, 0.5, 1, 1)
     print("\npi1 = 0.5, Cfn = 1, Cfp = 1\n")
-    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+    conf_bayes1 = confusion_matrix(predictions_bayes1, labels_infpar, 2)
 
     # pi1 = 0.8, Cfn = 1, Cfp = 1
-    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.8, 1, 1)
+    predictions_bayes2 = optimal_bayes_decisions(llr_infpar, 0.8, 1, 1)
     print("\npi1 = 0.8, Cfn = 1, Cfp = 1\n")
-    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+    conf_bayes2 = confusion_matrix(predictions_bayes2, labels_infpar, 2)
 
     # pi1 = 0.5, Cfn = 10, Cfp = 1
-    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.5, 10, 1)
+    predictions_bayes3 = optimal_bayes_decisions(llr_infpar, 0.5, 10, 1)
     print("\npi1 = 0.5, Cfn = 10, Cfp = 1\n")
-    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+    conf_bayes3 = confusion_matrix(predictions_bayes3, labels_infpar, 2)
 
     # pi1 = 0.8, Cfn = 1, Cfp = 10
-    predictions_bayes = optimal_bayes_decisions(llr_infpar, 0.8, 1, 10)
+    predictions_bayes4 = optimal_bayes_decisions(llr_infpar, 0.8, 1, 10)
     print("\npi1 = 0.8, Cfn = 1, Cfp = 10\n")
-    conf_bayes= confusion_matrix(predictions_bayes, labels_infpar, 2)
+    conf_bayes4 = confusion_matrix(predictions_bayes4, labels_infpar, 2)
 
+    # 3. Binary task: evaluation
 
+    DCF1 = empirical_bayes_risk(conf_bayes1, 0.5, 1, 1)
+    DCF2 = empirical_bayes_risk(conf_bayes2, 0.8, 1, 1)
+    DCF3 = empirical_bayes_risk(conf_bayes3, 0.5, 10, 1)
+    DCF4 = empirical_bayes_risk(conf_bayes4, 0.8, 1, 10)
+
+    print("\nEmpirical bayes risk\n")
+    print("(pi1, Cfn, Cfp)\tDCFu (B)")
+    print("-------------------------")
+    print("(0.5, 1, 1)\t%.3f" % (DCF1))
+    print("(0.8, 1, 1)\t%.3f" % (DCF2))
+    print("(0.5, 10, 1)\t%.3f" % (DCF3))
+    print("(0.8, 1, 10)\t%.3f" % (DCF4))
+
+    DCF1_norm = normalized_detection_cost(DCF1, 0.5, 1, 1)
+    DCF2_norm = normalized_detection_cost(DCF2, 0.8, 1, 1)
+    DCF3_norm = normalized_detection_cost(DCF3, 0.5, 10, 1)
+    DCF4_norm = normalized_detection_cost(DCF4, 0.8, 1, 10)
+
+    print("\nNormalized DCF\n")
+    print("(pi1, Cfn, Cfp)\tDCF")
+    print("-------------------------")
+    print("(0.5, 1, 1)\t%.3f" % (DCF1_norm))
+    print("(0.8, 1, 1)\t%.3f" % (DCF2_norm))
+    print("(0.5, 10, 1)\t%.3f" % (DCF3_norm))
+    print("(0.8, 1, 10)\t%.3f" % (DCF4_norm))
