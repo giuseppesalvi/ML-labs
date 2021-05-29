@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from numpy.lib.scimath import log
 from modules import gaussian_models as gm
 from modules import generative_models_text_classification as gmtx
@@ -142,6 +143,57 @@ def minimum_detection_costs(llr, labels, pi1, Cfn, Cfp):
     return min_DCF
 
 
+def plot_ROC(llr, labels):
+    """ plot the ROC curve TPR against FPR, given log likelihood ratios
+        and labels 
+    """
+
+    # consider a set of thresholds corresponding to (-inf, s1, ... , sM, inf)
+    # where s1 ... sM are the test scores, sorted in increasing order
+    thresholds = np.append(llr, [np.inf, -np.inf])
+    thresholds.sort()
+
+    # inititialize empty vectors that will contain coordinates of points to plot
+    FPRs = np.empty(thresholds.shape)
+    TPRs = np.empty(thresholds.shape)
+
+    for j, t in enumerate(thresholds):
+        # initialize an empty array for predictions of samples
+        predictions = np.empty(llr.shape, int)
+
+        # compare the log-likelihood ratio with threshold to predict the class
+        for i in range(llr.size):
+            if llr[i] > t:
+                predictions[i] = 1
+            else:
+                predictions[i] = 0
+
+        # compute the confusion matrix
+        conf = confusion_matrix(predictions, labels, 2, False)
+
+        # FNR = false negative rate
+        FNR = conf[0][1] / \
+            (conf[0][1] + conf[1][1])
+
+        # TPR = True positive rate
+        TPR = 1 - FNR
+
+        # FPR = false positive rate
+        FPR = conf[1][0] / \
+            (conf[0][0] + conf[1][0])
+
+        # Add results to the arrays
+        FPRs[j] = FPR 
+        TPRs[j] = TPR
+
+    # Plot the ROC, on x-axis all the FPRs, on y-asis all the TPRs
+    plt.figure()
+    plt.xlabel("FPR")
+    plt.ylabel("TPR")
+    plt.plot(FPRs, TPRs)
+    plt.show()
+    return
+   
 if __name__ == "__main__":
 
     # 1. Confusion matrices and accuracy
@@ -267,3 +319,5 @@ if __name__ == "__main__":
     print("(0.5, 10, 1)\t%.3f" % (DCF3_min))
     print("(0.8, 1, 10)\t%.3f" % (DCF4_min))
 
+    # 5. ROC curves
+    plot_ROC(llr_infpar, labels_infpar)
