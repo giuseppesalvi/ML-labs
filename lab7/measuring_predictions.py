@@ -209,10 +209,11 @@ def bayes_error_plots(llr, labels, eff_prior_log_odds):
     plt.figure()
     plt.plot(eff_prior_log_odds, DCFs, label="DCF", color="r")
     plt.plot(eff_prior_log_odds, min_DCFs, label="min DCF", color="b")
+    plt.legend()
     plt.ylim([0, 1.1])
     plt.xlim([-3, 3])
     plt.show()
-    return
+    return DCFs, min_DCFs
 
 
 if __name__ == "__main__":
@@ -345,4 +346,47 @@ if __name__ == "__main__":
 
     # 6. Bayes error plots
     eff_prior_log_odds = np.linspace(-3, 3, 21)
-    bayes_error_plots(llr_infpar, labels_infpar, eff_prior_log_odds)
+    DCFs, min_DCFs = bayes_error_plots(llr_infpar, labels_infpar, eff_prior_log_odds)
+
+    # 7. Comparing recognizers
+    llr_infpar_eps1 = np.load("data/commedia_llr_infpar_eps1.npy")
+    labels_infpar_eps1 = np.load("data/commedia_labels_infpar_eps1.npy")
+
+    DCF1_norm_eps1 = normalized_detection_cost(empirical_bayes_risk(confusion_matrix(optimal_bayes_decisions(llr_infpar_eps1, 0.5, 1, 1), labels_infpar_eps1, 2, False), 0.5, 1, 1), 0.5, 1, 1)
+    DCF2_norm_eps1 = normalized_detection_cost(empirical_bayes_risk(confusion_matrix(optimal_bayes_decisions(llr_infpar_eps1, 0.8, 1, 1), labels_infpar_eps1, 2, False), 0.8, 1, 1), 0.8, 1, 1)
+    DCF3_norm_eps1 = normalized_detection_cost(empirical_bayes_risk(confusion_matrix(optimal_bayes_decisions(llr_infpar_eps1, 0.5, 10, 1), labels_infpar_eps1, 2, False), 0.5, 10, 1), 0.5, 10, 1)
+    DCF4_norm_eps1 = normalized_detection_cost(empirical_bayes_risk(confusion_matrix(optimal_bayes_decisions(llr_infpar_eps1, 0.8, 1, 10), labels_infpar_eps1, 2, False), 0.8, 1, 10), 0.8, 1, 10)
+
+    print("\nNormalized DCF e = 1\n")
+    print("(pi1, Cfn, Cfp)\tDCF")
+    print("-------------------------")
+    print("(0.5, 1, 1)\t%.3f" % (DCF1_norm_eps1))
+    print("(0.8, 1, 1)\t%.3f" % (DCF2_norm_eps1))
+    print("(0.5, 10, 1)\t%.3f" % (DCF3_norm_eps1))
+    print("(0.8, 1, 10)\t%.3f" % (DCF4_norm_eps1))
+
+
+    DCF1_min_eps1 = minimum_detection_costs(llr_infpar_eps1, labels_infpar_eps1, 0.5, 1, 1)
+    DCF2_min_eps1 = minimum_detection_costs(llr_infpar_eps1, labels_infpar_eps1, 0.8, 1, 1)
+    DCF3_min_eps1 = minimum_detection_costs(llr_infpar_eps1, labels_infpar_eps1, 0.5, 10, 1)
+    DCF4_min_eps1 = minimum_detection_costs(llr_infpar_eps1, labels_infpar_eps1, 0.8, 1, 10)
+
+    print("\nMinimum detection Costs e = 1\n")
+    print("(pi1, Cfn, Cfp)\tmin DCF")
+    print("-------------------------")
+    print("(0.5, 1, 1)\t%.3f" % (DCF1_min_eps1))
+    print("(0.8, 1, 1)\t%.3f" % (DCF2_min_eps1))
+    print("(0.5, 10, 1)\t%.3f" % (DCF3_min_eps1))
+    print("(0.8, 1, 10)\t%.3f" % (DCF4_min_eps1))
+
+    DCFs_eps1, min_DCFs_eps1 = bayes_error_plots(llr_infpar_eps1, labels_infpar_eps1, eff_prior_log_odds)
+
+    plt.figure()
+    plt.plot(eff_prior_log_odds, DCFs, color="r", label= "DCF (e = 0.001)")
+    plt.plot(eff_prior_log_odds, min_DCFs, color="b", label="min DCF (e = 0.001)")
+    plt.plot(eff_prior_log_odds, DCFs_eps1, color="y", label="DCF (e = 1)")
+    plt.plot(eff_prior_log_odds, min_DCFs_eps1, color="g", label="DCF (e = 1)")
+    plt.legend()
+    plt.ylim([0, 1.1])
+    plt.xlim([-3, 3])
+    plt.show()
