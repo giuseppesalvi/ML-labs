@@ -37,7 +37,7 @@ def svm_dual_wrapper(DTR, LTR, K):
         # J_D_hat = -1/2 * np.dot(np.dot(alpha.T, H_hat), alpha) + \
         #     np.dot(alpha.T, np.ones(N))
 
-        # need to use multi_dot becuase it gives numerical problems otherwise
+        # need to use multi_dot because it gives numerical problems otherwise
         J_D_hat = -1/2 * np.linalg.multi_dot([alpha.T, H_hat, alpha]) + \
             np.dot(alpha.T, np.ones(N))
 
@@ -97,12 +97,6 @@ if __name__ == "__main__":
             w_s_hat = svm_primal_from_dual(mcol(x), DTR, LTR, K)
 
             # Compute scores S
-
-            # option 1: doesn't work
-            # w_s = w_s_hat[0:-1]
-            # b_s = w_s_hat[-1]
-            # S = np.dot(mcol(w_s).T, DTE) + b_s
-
             # DTE_ is the extended data matrix for the evaluation set
             DTE_ = np.vstack((DTE, np.ones(DTE.shape[1]) * K))
             S = np.dot(mcol(w_s_hat).T, DTE_)
