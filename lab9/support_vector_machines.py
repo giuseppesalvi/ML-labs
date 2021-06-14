@@ -7,9 +7,9 @@ from modules.gaussian_models import split_db_2to1
 def mcol(v):
     return v.reshape((v.size, 1))
 
+
 def mrow(v):
     return v.reshape((1, v.size))
-
 
 
 def load_iris_binary():
@@ -33,13 +33,11 @@ def svm_dual_wrapper(DTR, LTR, K):
         D_hat = np.vstack((DTR, np.ones(N) * K))
         G_hat = np.dot(D_hat.T, D_hat)
         H_hat = z * z.T * G_hat
-        
-        # z = np.array(2 * LTR - 1).reshape(1, N)
-        # H_hat = np.dot(z.T*D_hat.T, z * D_hat )
 
+        # J_D_hat = -1/2 * np.dot(np.dot(alpha.T, H_hat), alpha) + \
+        #     np.dot(alpha.T, np.ones(N))
 
-        #J_D_hat = -1/2 * np.dot(np.dot(alpha.T, H_hat), alpha) + \
-        #    np.dot(alpha.T, np.ones(N))
+        # need to use multi_dot becuase it gives numerical problems otherwise
         J_D_hat = -1/2 * np.linalg.multi_dot([alpha.T, H_hat, alpha]) + \
             np.dot(alpha.T, np.ones(N))
 
@@ -50,31 +48,26 @@ def svm_dual_wrapper(DTR, LTR, K):
     return svm_dual
 
 
-def svm_primal_from_dual(alpha_s, DTR, LTR, K):
+def svm_primal_from_dual(alpha, DTR, LTR, K):
     """
     """
     N = LTR.shape[0]
-    # z = np.array(2 * LTR - 1).reshape(1, N)
-    # D = np.vstack((DTR, np.ones(N) * K))
-    # w_s = np.dot(np.dot(alpha_s, z), D).sum
-    
-    z = np.array(2 * LTR - 1).reshape(N, 1)
+    z = mcol(np.array(2 * LTR - 1))
     D = np.vstack((DTR, np.ones(N) * K))
-    w_s = np.sum(alpha_s * z * D.T, axis = 0) # w_s with hat ^
-    # w_s = np.sum(np.dot(np.dot(alpha_s, z), D), axis=0)
-    return w_s
+    w_s_hat = np.sum(alpha * z * D.T, axis=0)  
+    return w_s_hat
 
-def svm_primal_objective(w_s, DTR, LTR, K, C):
+
+def svm_primal_objective(w_s_hat, DTR, LTR, K, C):
     """
     """
     N = LTR.shape[0]
-    # z = np.array(2 * LTR - 1).reshape(N, 1)
-    z = np.array(2 * LTR - 1).reshape(1, N)
-    D = np.vstack((DTR, np.ones(N) * K))
-    w_s = w_s.reshape((w_s.size, 1))
-    f = 1 - z * np.dot(w_s.T, D)
-    J = 1/2 * (w_s * w_s).sum() + C * np.sum(np.maximum(np.zeros(f.shape), f)) 
-    return J
+    z = mrow(np.array(2 * LTR - 1))
+    D_hat = np.vstack((DTR, np.ones(N) * K))
+    f = 1 - z * np.dot(w_s_hat.T, D_hat)
+    J_hat = 1/2 * (w_s_hat * w_s_hat).sum() + C * \
+        np.sum(np.maximum(np.zeros(f.shape), f))
+    return J_hat
 
 
 if __name__ == "__main__":
@@ -101,24 +94,30 @@ if __name__ == "__main__":
             x, f, d = op.fmin_l_bfgs_b(svm_dual, x0, factr=1.0, bounds=bounds)
 
             # Recover primal solution from dual solution
-            w_s = svm_primal_from_dual(mcol(x), DTR, LTR, K)
-            # w_s = svm_primal_from_dual(x.reshape(x.shape[0], 1), DTR, LTR, K)
+            w_s_hat = svm_primal_from_dual(mcol(x), DTR, LTR, K)
 
             # Compute scores S
-            w_s_ = w_s[0:-1] # w star without hat ^
-            b_s = w_s[-1]
-            S = np.dot(mcol(w_s_).T, DTE) + b_s
+
+            # option 1: doesn't work
+            # w_s = w_s_hat[0:-1]
+            # b_s = w_s_hat[-1]
+            # S = np.dot(mcol(w_s).T, DTE) + b_s
+
+            # DTE_ is the extended data matrix for the evaluation set
+            DTE_ = np.vstack((DTE, np.ones(DTE.shape[1]) * K))
+            S = np.dot(mcol(w_s_hat).T, DTE_)
 
             # Assign pattern comparing scores with threshold = 0
             predictions = 1 * (S > 0)
-            
+
             # Compute accuracy and error rate
-            correct_p= (predictions == LTE).sum()
-            wrong_p= predictions.size - correct_p
+            correct_p = (predictions == LTE).sum()
+            wrong_p = predictions.size - correct_p
             accuracy = correct_p / predictions.size
             error = wrong_p / predictions.size
 
-            primal_obj = svm_primal_objective(w_s, DTR, LTR, K, C)
+            primal_obj = svm_primal_objective(mcol(w_s_hat), DTR, LTR, K, C)
             dual_obj = -f
-            duality_gap = primal_obj - dual_obj 
-            print("K: %d, C : %.1f, Primal loss: %5e  Dual loss: %5e  Duality gap: %5e  Error rate: %.1f" % (K, C, primal_obj, dual_obj, duality_gap, error*100), "%")
+            duality_gap = primal_obj - dual_obj
+            print("K: %d, C : %.1f, Primal loss: %5e  Dual loss: %5e  Duality gap: %5e  Error rate: %.1f" % (
+                K, C, primal_obj, dual_obj, duality_gap, error*100), "%")
