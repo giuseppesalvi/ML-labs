@@ -4,6 +4,14 @@ import scipy.optimize as op
 from modules.gaussian_models import split_db_2to1
 
 
+def mcol(v):
+    return v.reshape((v.size, 1))
+
+def mrow(v):
+    return v.reshape((1, v.size))
+
+
+
 def load_iris_binary():
     D, L = da.load_iris()['data'].T, da.load_iris()['target']
     D = D[:, L != 0]  # We remove setosa from D
@@ -20,21 +28,25 @@ def svm_dual_wrapper(DTR, LTR, K):
         """
         N = DTR.shape[1]
 
+        z = mcol(np.array(2 * LTR - 1))
+
+        D_hat = np.vstack((DTR, np.ones(N) * K))
+        G_hat = np.dot(D_hat.T, D_hat)
+        H_hat = z * z.T * G_hat
+        
         # z = np.array(2 * LTR - 1).reshape(1, N)
-        z = np.array(2 * LTR - 1).reshape(N, 1)
+        # H_hat = np.dot(z.T*D_hat.T, z * D_hat )
 
-        D = np.vstack((DTR, np.ones(N) * K))
 
-        G = np.dot(D.T, D)
-        H = z * z.T * G
-
-        J_D = -1/2 * np.dot(np.dot(alpha.T, H), alpha) + \
+        #J_D_hat = -1/2 * np.dot(np.dot(alpha.T, H_hat), alpha) + \
+        #    np.dot(alpha.T, np.ones(N))
+        J_D_hat = -1/2 * np.linalg.multi_dot([alpha.T, H_hat, alpha]) + \
             np.dot(alpha.T, np.ones(N))
 
-        L_D = - J_D
-        grad_L_D = (np.dot(H, alpha) - np.ones(N)).reshape(N, 1)
+        L_D_hat = - J_D_hat
+        grad_L_D_hat = mcol(np.dot(H_hat, alpha) - np.ones(N))
 
-        return L_D, grad_L_D
+        return L_D_hat, grad_L_D_hat
     return svm_dual
 
 
@@ -49,6 +61,7 @@ def svm_primal_from_dual(alpha_s, DTR, LTR, K):
     z = np.array(2 * LTR - 1).reshape(N, 1)
     D = np.vstack((DTR, np.ones(N) * K))
     w_s = np.sum(alpha_s * z * D.T, axis = 0) # w_s with hat ^
+    # w_s = np.sum(np.dot(np.dot(alpha_s, z), D), axis=0)
     return w_s
 
 def svm_primal_objective(w_s, DTR, LTR, K, C):
@@ -88,13 +101,13 @@ if __name__ == "__main__":
             x, f, d = op.fmin_l_bfgs_b(svm_dual, x0, factr=1.0, bounds=bounds)
 
             # Recover primal solution from dual solution
-            w_s = svm_primal_from_dual(x.reshape(x.size, 1), DTR, LTR, K)
+            w_s = svm_primal_from_dual(mcol(x), DTR, LTR, K)
             # w_s = svm_primal_from_dual(x.reshape(x.shape[0], 1), DTR, LTR, K)
 
             # Compute scores S
             w_s_ = w_s[0:-1] # w star without hat ^
             b_s = w_s[-1]
-            S = np.dot(w_s_.reshape(w_s_.size, 1).T, DTE) + b_s
+            S = np.dot(mcol(w_s_).T, DTE) + b_s
 
             # Assign pattern comparing scores with threshold = 0
             predictions = 1 * (S > 0)
