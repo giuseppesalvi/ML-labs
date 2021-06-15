@@ -82,9 +82,12 @@ def RBF_kernel(X1, X2, c, d, gamma):
     """
     X1 = X1.T
     X2 = X2.T
+    # return np.exp(-gamma*np.sum((X2-X1[:,np.newaxis])**2, axis=-1))
+
+    # optimized version using property of norm:
+    # ||X1-X2||^2 = ||X1||^2 + ||X2||^2 - 2 * X1.T * Y
     X1_norm = np.sum(X1 ** 2, axis=-1)
     X2_norm = np.sum(X2 ** 2, axis=-1)
-    # return np.exp(-gamma*np.sum((X2-X1[:,np.newaxis])**2, axis=-1))
     return np.exp(-gamma * (X1_norm[:, None] + X2_norm[None, :] - 2 * np.dot(X1, X2.T)))
 
 
@@ -98,6 +101,7 @@ def svm_dual_kernel_wrapper(DTR, LTR, kernel, K, c, d, gamma):
 
         z = mcol(np.array(2 * LTR - 1))
 
+        # + K^2 (=Xi) for regularized bias in non-linear svm version
         H_hat = z * z.T * (kernel(DTR, DTR, c, d, gamma) + K**2)
 
         # J_D_hat = -1/2 * np.dot(np.dot(alpha.T, H_hat), alpha) + \
@@ -203,15 +207,10 @@ if __name__ == "__main__":
                         S[t] += mcol(x)[i] * z[i] * \
                             (polynomial_kernel(
                                 DTR.T[i], DTE.T[t], c, d, 0) + K**2)
+            # + K^2 (=Xi) for regularized bias in non-linear svm version
 
             # Assign pattern comparing scores with threshold = 0
             predictions = 1 * (S > 0)
-            #predictions = np.empty(S.size)
-            # for i,s in enumerate(S):
-            #    if s > 0:
-            #        predictions[i] = 1
-            #    else:
-            #        predictions[i] = 0
 
             # Compute accuracy and error rate
             correct_p = (predictions == LTE).sum()
@@ -235,13 +234,13 @@ if __name__ == "__main__":
             S = np.empty(LTE.size)
             z = mcol(np.array(2 * LTR - 1))
 
-           
             for t in range(LTE.size):
                 for i in range(N):
                     if(mcol(x)[i] > 0):
                         S[t] += mcol(x)[i] * z[i] * \
                             (RBF_kernel(mcol(DTR.T[i]), mcol(
-                                DTE.T[t]), 0, 0, g) + K**2) 
+                                DTE.T[t]), 0, 0, g) + K**2)
+            # + K^2 (=Xi) for regularized bias in non-linear svm version
 
             # Assign pattern comparing scores with threshold = 0
             predictions = 1 * (S > 0)
