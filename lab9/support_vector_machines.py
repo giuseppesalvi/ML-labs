@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.lib.polynomial import poly
 import sklearn.datasets as da
 import scipy.optimize as op
 from modules.gaussian_models import split_db_2to1
