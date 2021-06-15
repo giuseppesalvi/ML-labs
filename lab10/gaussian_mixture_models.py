@@ -1,3 +1,4 @@
+from matplotlib.pyplot import axis
 import numpy as np
 import scipy.special as sps
 from data.GMM_load import load_gmm
@@ -7,6 +8,12 @@ def vcol(x):
     """ reshape the vector x into a column vector """
 
     return x.reshape(x.shape[0], 1)
+
+
+def vrow(x):
+    """ reshape the vector x into a row vector """
+
+    return x.reshape(1, x.shape[0])
 
 
 def logpdf_GMM(X, gmm):
@@ -45,6 +52,67 @@ def logpdf_GMM(X, gmm):
     return logdens
 
 
+def EM_algorithm(X, initial_gmm):
+    """ Implementation of the GMM EM estimation procediure:
+        the EM algorithm is useful to estimate the parameters of a GMM
+        that maximize the likelihood for traning set X
+        The initial estimate of the GMM is passes as parameter
+    """
+
+    gmm = initial_gmm
+    stop = False
+
+    # continue the algorithm untill the stopping criterion is met
+    while(stop == False):
+
+        # E-step
+
+        M = len(gmm)
+        N = X.shape[1]
+
+        # Each row of S contains the (sub-)class conditional densities given
+        # component Gi = g for all samples xi
+        S = np.empty([M, N])
+
+        for g in range(len(gmm)):
+            for j, sample in enumerate(X.T):
+                sample = vcol(sample)
+                # gmm[g][1] = mu_g, gmm[g][2] = C_g
+                S[g, j] = logpdf_GAU_ND(sample, vcol(gmm[g][1]), gmm[g][2])
+
+        # Add to each row of S the logarithm of the prior of the corresponding 
+        # component log w_g 
+        for g in range(len(gmm)):
+            # gmm[g][0] = w_g
+            S[g, :] += np.log(gmm[g][0])
+
+        # S is now the matrix of joint densities f_Xi,Gi(xi,g)
+        
+        # Compute the log-marginal log f_Xi(xi) for all samples xi
+        logdens = sps.logsumexp(S, axis=0)
+
+        # Remove from each row of the joint densities matrix S the row vector
+        # containing the N marginal densities logdens
+        log_responsabilities = S - logdens
+
+        # Compute the MxN matrix of posterior probabilities, responsabilities
+        responsabilities = np.exp(log_responsabilities)
+
+        # M-step
+
+        # Compute statistics
+        Zg = responsabilities.sum(axis=1)
+        # Fg = (np.dot(responsabilities, X.T)).sum(axis=1)
+        # Sg = (np.dot(np.dot(responsabilities, X.T), X)).sum(axis=1)
+
+        # Obtain the new paramters
+        # mu_new = Fg / Zg
+        # sigma_new = (Sg / Zg) - np.dot(mu_new, mu_new.T)
+        # w_new = Zg / (Zg.sum())
+
+    return 0
+
+
 if __name__ == "__main__":
 
     # Gaussian mixture models
@@ -73,4 +141,5 @@ if __name__ == "__main__":
 
 
     # GMM estimation: the EM algorithm
-    
+
+    avg_ll = EM_algorithm(X, gmm) 
