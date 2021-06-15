@@ -80,8 +80,12 @@ def polynomial_kernel(X1, X2, c, d, gamma):
 def RBF_kernel(X1, X2, c, d, gamma):
     """
     """
-    return np.exp(-gamma * ((X1 - X2) * (X1 - X2)).sum())
-
+    X1 = X1.T
+    X2 = X2.T
+    X1_norm = np.sum(X1 ** 2, axis = -1)
+    X2_norm = np.sum(X2 ** 2, axis = -1)
+    return np.exp(-gamma * (X1_norm[:,None] + X2_norm[None,:] - 2 * np.dot(X1, X2.T)))
+    #return np.exp(-gamma*np.sum((X2-X1[:,np.newaxis])**2, axis=-1))
 
 def svm_dual_kernel_wrapper(DTR, LTR, kernel, K, c, d, gamma):
     """
@@ -123,7 +127,11 @@ if __name__ == "__main__":
     # Linear SVM
     K_list = [1, 10]
     C_list = [0.1, 1.0, 10.0]
+    print("\n----------------------------------------------------------")
     print("Linear SVM")
+    print("----------------------------------------------------------\n")
+    print("K\tC\tPrimal loss\tDual loss\tDuality gap\tError rate")
+    print("--------------------------------------------------------------------------")
     for K in K_list:
         svm_dual = svm_dual_wrapper(DTR, LTR, K)
         for C in C_list:
@@ -154,8 +162,9 @@ if __name__ == "__main__":
             primal_obj = svm_primal_objective(mcol(w_s_hat), DTR, LTR, K, C)
             dual_obj = -f
             duality_gap = primal_obj - dual_obj
-            print("K: %d, C : %.1f, Primal loss: %5e  Dual loss: %5e  Duality gap: %5e  Error rate: %.1f" % (
+            print("%d\t%.1f\t%5e\t%5e\t%5e\t%.1f" % (
                 K, C, primal_obj, dual_obj, duality_gap, error*100), "%")
+    print("\n----------------------------------------------------------\n")
 
     # Kernel SVM
     C = 1
@@ -164,6 +173,12 @@ if __name__ == "__main__":
         bounds.append((0, C))
 
     K_list = [0.0, 1.0]
+
+    print("\n----------------------------------------------------------")
+    print("Kernel SVM")
+    print("----------------------------------------------------------\n")
+    print("K\tC\tKernel\t\tDual loss\tError rate")
+    print("----------------------------------------------------------")
 
     # polynomial kernel of degree d
     d = 2
@@ -176,18 +191,16 @@ if __name__ == "__main__":
 
             x, f, d_ = op.fmin_l_bfgs_b(
                 svm_dual_kernel, x0, factr=1.0, bounds=bounds)
-            # S = np.sum( , axis=0)
+
+            # Compute scores of test samples
             S = np.empty(LTE.size)
             z = mcol(np.array(2 * LTR - 1))
 
             for t in range(LTE.size):
                 for i in range(N):
-                    S[t] += mcol(x)[i] * z[i] * \
-                        polynomial_kernel(DTR.T[i], DTE.T[t], c, d, 0)
-            # for t in range(LTE.size):
-                #S[t] = np.sum(mcol(x) * mcol(z) * polynomial_kernel(DTR.T, DTE.T[t], c, d, 0))
-                #S[t] = np.sum(np.dot(mrow(x), mcol(z)) * polynomial_kernel(DTE, DTE.T[t], c, d, 0))
-            #S = np.sum(mcol(x) * mcol(z) * polynomial_kernel(DTE, DTE, c, d, 0), axis=0)
+                    if(mcol(x)[i] > 0):
+                        S[t] += mcol(x)[i] * z[i] * \
+                            polynomial_kernel(DTR.T[i], DTE.T[t], c, d, 0)
 
             # Assign pattern comparing scores with threshold = 0
             predictions = 1 * (S > 0)
@@ -197,8 +210,40 @@ if __name__ == "__main__":
             wrong_p = predictions.size - correct_p
             accuracy = correct_p / predictions.size
             error = wrong_p / predictions.size
-
-            print("K: %.1f, C : %.1f, Kernel: Poly(d=%d, c=%d) Dual loss: %5e error rate: %.1f" % (
+            print("%.1f\t%.1f\tPoly(d=%d, c=%d)\t%5e\t%.1f" % (
                 K, C, d, c, -f, error*100), "%")
 
+    # RBF kernel with gamma g
     gamma_list = [1, 10]
+    for g in gamma_list:
+        for K in K_list:
+            svm_dual_kernel = svm_dual_kernel_wrapper(
+                DTR, LTR, RBF_kernel, K, 0, 0, g)
+
+            x, f, d_ = op.fmin_l_bfgs_b(
+                svm_dual_kernel, x0, factr=1.0, bounds=bounds)
+
+            # Compute scores of test samples
+            S = np.empty(LTE.size)
+            z = mcol(np.array(2 * LTR - 1))
+
+            # TODO: is not working properly
+            # for t in range(LTE.size):
+            #     for i in range(N):
+            #         if(mcol(x)[i] > 0):
+            #             S[t] += mcol(x)[i] * z[i] * \
+            #                 RBF_kernel(DTR.T[i], DTE.T[t], 0, 0, g)
+
+            # Assign pattern comparing scores with threshold = 0
+            predictions = 1 * (S > 0)
+
+            # Compute accuracy and error rate
+            correct_p = (predictions == LTE).sum()
+            wrong_p = predictions.size - correct_p
+            accuracy = correct_p / predictions.size
+            error = wrong_p / predictions.size
+            print("%.1f\t%.1f\tRBF(gamma=%d)\t%5e\t%.1f" % (
+                K, C, g, -f, error*100), "%")
+
+
+    print("\n----------------------------------------------------------\n")
