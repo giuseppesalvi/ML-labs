@@ -84,8 +84,8 @@ def RBF_kernel(X1, X2, c, d, gamma):
     X2 = X2.T
     X1_norm = np.sum(X1 ** 2, axis = -1)
     X2_norm = np.sum(X2 ** 2, axis = -1)
-    return np.exp(-gamma * (X1_norm[:,None] + X2_norm[None,:] - 2 * np.dot(X1, X2.T)))
     #return np.exp(-gamma*np.sum((X2-X1[:,np.newaxis])**2, axis=-1))
+    return np.exp(-gamma * (X1_norm[:,None] + X2_norm[None,:] - 2 * np.dot(X1, X2.T)))
 
 def svm_dual_kernel_wrapper(DTR, LTR, kernel, K, c, d, gamma):
     """
@@ -227,12 +227,11 @@ if __name__ == "__main__":
             S = np.empty(LTE.size)
             z = mcol(np.array(2 * LTR - 1))
 
-            # TODO: is not working properly
-            # for t in range(LTE.size):
-            #     for i in range(N):
-            #         if(mcol(x)[i] > 0):
-            #             S[t] += mcol(x)[i] * z[i] * \
-            #                 RBF_kernel(DTR.T[i], DTE.T[t], 0, 0, g)
+            for t in range(LTE.size):
+                for i in range(N):
+                    if(mcol(x)[i] > 0):
+                        S[t] += mcol(x)[i] * z[i] * \
+                            RBF_kernel(mcol(DTR.T[i]), mcol(DTE.T[t]), 0, 0, g)
 
             # Assign pattern comparing scores with threshold = 0
             predictions = 1 * (S > 0)
