@@ -1,4 +1,6 @@
 import json
+import numpy
+
 def save_gmm(gmm, filename):
     gmmJson = [(i, j.tolist(), k.tolist()) for i, j, k in gmm]
     with open(filename, 'w') as f:
