@@ -48,13 +48,14 @@ def svm_dual_wrapper(DTR, LTR, K):
         return L_D_hat, grad_L_D_hat
     return svm_dual
 
+
 def svm_primal_from_dual(alpha, DTR, LTR, K):
     """
     """
     N = LTR.shape[0]
     z = mcol(np.array(2 * LTR - 1))
     D = np.vstack((DTR, np.ones(N) * K))
-    w_s_hat = np.sum(alpha * z * D.T, axis=0)  
+    w_s_hat = np.sum(alpha * z * D.T, axis=0)
     return w_s_hat
 
 
@@ -74,11 +75,13 @@ def polynomial_kernel(X1, X2, c, d, gamma):
     """
     """
     return (np.dot(X1.T, X2) + c) ** d
-    
+
+
 def RBF_kernel(X1, X2, c, d, gamma):
     """
     """
-    return np.exp(-gamma * ((X1 - X2) * (X1 - X2)).sum()) 
+    return np.exp(-gamma * ((X1 - X2) * (X1 - X2)).sum())
+
 
 def svm_dual_kernel_wrapper(DTR, LTR, kernel, K, c, d, gamma):
     """
@@ -154,7 +157,6 @@ if __name__ == "__main__":
             print("K: %d, C : %.1f, Primal loss: %5e  Dual loss: %5e  Duality gap: %5e  Error rate: %.1f" % (
                 K, C, primal_obj, dual_obj, duality_gap, error*100), "%")
 
-
     # Kernel SVM
     C = 1
     bounds = []
@@ -162,18 +164,40 @@ if __name__ == "__main__":
         bounds.append((0, C))
 
     K_list = [0.0, 1.0]
-    
+
     # polynomial kernel of degree d
     d = 2
     c_list = [0, 1]
 
     for c in c_list:
         for K in K_list:
-            svm_dual_kernel = svm_dual_kernel_wrapper(DTR, LTR, polynomial_kernel, K, c, d, 0)
+            svm_dual_kernel = svm_dual_kernel_wrapper(
+                DTR, LTR, polynomial_kernel, K, c, d, 0)
 
-            x, f, d_ = op.fmin_l_bfgs_b(svm_dual_kernel, x0, factr=1.0, bounds=bounds)
+            x, f, d_ = op.fmin_l_bfgs_b(
+                svm_dual_kernel, x0, factr=1.0, bounds=bounds)
             # S = np.sum( , axis=0)
-            error = 0
+            S = np.empty(LTE.size)
+            z = mcol(np.array(2 * LTR - 1))
+
+            for t in range(LTE.size):
+                for i in range(N):
+                    S[t] += mcol(x)[i] * z[i] * \
+                        polynomial_kernel(DTR.T[i], DTE.T[t], c, d, 0)
+            # for t in range(LTE.size):
+                #S[t] = np.sum(mcol(x) * mcol(z) * polynomial_kernel(DTR.T, DTE.T[t], c, d, 0))
+                #S[t] = np.sum(np.dot(mrow(x), mcol(z)) * polynomial_kernel(DTE, DTE.T[t], c, d, 0))
+            #S = np.sum(mcol(x) * mcol(z) * polynomial_kernel(DTE, DTE, c, d, 0), axis=0)
+
+            # Assign pattern comparing scores with threshold = 0
+            predictions = 1 * (S > 0)
+
+            # Compute accuracy and error rate
+            correct_p = (predictions == LTE).sum()
+            wrong_p = predictions.size - correct_p
+            accuracy = correct_p / predictions.size
+            error = wrong_p / predictions.size
+
             print("K: %.1f, C : %.1f, Kernel: Poly(d=%d, c=%d) Dual loss: %5e error rate: %.1f" % (
                 K, C, d, c, -f, error*100), "%")
 
