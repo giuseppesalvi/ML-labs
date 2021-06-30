@@ -62,11 +62,14 @@ def logpdf_GAU_ND(x, mu, C):
     """
     # M is the number of rows of x, n of attributes for each sample
     M = x.shape[0]
-    first = -(M/2) * np.log(2*np.pi)
-    second = -0.5 * np.linalg.slogdet(C)[1]
-    third = -0.5 * np.dot(
-        np.dot((x-mu).T, np.linalg.inv(C)), (x - mu))
-    return np.diag(first+second+third)
+    if (M == 1):
+        return GAU_logpdf(x, mu, C)
+    else:
+        first = -(M/2) * np.log(2*np.pi)
+        second = -0.5 * np.linalg.slogdet(C)[1]
+        third = -0.5 * np.dot(
+            np.dot((x-mu).T, np.linalg.inv(C)), (x - mu))
+        return np.diag(first+second+third)
 
 
 if __name__ == "__main__":
