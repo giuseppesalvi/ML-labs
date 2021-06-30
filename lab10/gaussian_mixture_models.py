@@ -61,15 +61,22 @@ def EM_algorithm(X, initial_gmm):
     """
 
     gmm = initial_gmm
+    M = len(gmm)
+    N = X.shape[1]
     stop = False
 
+    # calculate the average loglikelihood using the initial gmm
+    previous_avg_ll = sum(logpdf_GMM(X, initial_gmm)) / N
+
+    print("-"*40)
+    print("\nEM algorithm starting\n")
+    print("INITIAL avg ll: ", previous_avg_ll)
+
     # continue the algorithm untill the stopping criterion is met
+    counter = 1
     while(stop == False):
 
         # E-step
-
-        M = len(gmm)
-        N = X.shape[1]
 
         # Each row of S contains the (sub-)class conditional densities given
         # component Gi = g for all samples xi
@@ -110,21 +117,31 @@ def EM_algorithm(X, initial_gmm):
             Fg_list.append((vrow(responsabilities[g]) * X).sum(axis=1))
             tmp = np.zeros((4, 4))
             for i in range(N):
-                tmp += responsabilities[g][i] * np.dot(vcol(X.T[i]), vrow(X.T[i]))
+                tmp += responsabilities[g][i] * \
+                    np.dot(vcol(X.T[i]), vrow(X.T[i]))
             Sg_list.append(tmp)
-
-        ##Zg = responsabilities.sum(axis=1)
-        # Fg = (np.dot(responsabilities, X.T)).sum(axis=1)
-        # Sg = (np.dot(np.dot(responsabilities, X.T), X)).sum(axis=1)
 
         # Obtain the new paramters
         for g in range(M):
             w_new = (Zg_list[g] / sum(Zg_list))[0]  # extract the float
             mu_new = vcol(Fg_list[g] / Zg_list[g])
-            sigma_new = (Sg_list[g] / Zg_list[g]) - np.dot(vcol(mu_new), vrow(mu_new))
-            gmm[g]= (w_new, mu_new, sigma_new)
+            sigma_new = (Sg_list[g] / Zg_list[g]) - \
+                np.dot(vcol(mu_new), vrow(mu_new))
+            gmm[g] = (w_new, mu_new, sigma_new)
 
-        # Check stopping criterion TODO
+        # Check stopping criterion
+        threshold = 1e-6
+        this_avg_ll = sum(logpdf_GMM(X, gmm)) / N
+        print("ITERATION ", counter, " avg ll: ", this_avg_ll)
+        if (this_avg_ll - previous_avg_ll < threshold):
+            stop = True
+            print("STOPPING CRITERION MET")
+            print("\nEM algorithm finished\n")
+            print("-"*40)
+        else:
+            previous_avg_ll = this_avg_ll
+            counter += 1
+
     return 0
 
 
