@@ -61,12 +61,14 @@ def logpdf_GMM(X, gmm):
     return logdens
 
 
-def EM_algorithm(X, initial_gmm, printDetails=False):
+def EM_algorithm(X, initial_gmm, psi=0.001, printDetails=False):
     """ Implementation of the GMM EM estimation procediure:
         the EM algorithm is useful to estimate the parameters of a GMM
         that maximize the likelihood for traning set X
         The initial estimate of the GMM is passed as parameter
-        print is a boolean, to print iterations of the algorithm or no
+        psi is used to constrain the eigenvalues of covariance matrices 
+        in order to avoid degenerate solutions
+        printDetails is a boolean, to print iterations of the algorithm or no
     """
 
     gmm = initial_gmm
@@ -138,6 +140,11 @@ def EM_algorithm(X, initial_gmm, printDetails=False):
             mu_new = vcol(Fg_list[g] / Zg_list[g])
             sigma_new = (Sg_list[g] / Zg_list[g]) - \
                 np.dot(vcol(mu_new), vrow(mu_new))
+            # Constraining the eigenvalues of the covariance matrices to be
+            # larger of equal to psi
+            U, s, _ = np.linalg.svd(sigma_new)
+            s[s<psi] = psi
+            sigma_new = np.dot(U, vcol(s)*U.T)
             gmm[g] = (w_new, mu_new, sigma_new)
 
         # Check stopping criterion
@@ -167,7 +174,7 @@ def EM_algorithm(X, initial_gmm, printDetails=False):
 #     return
 
 
-def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, printDetails=False):
+def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.001, printDetails=False):
     """ Implementation of the LBG algorithm:
         starting from a gmm passed as parameter (or GMM_1  if nothing is passed)
         incrementally constructs a GMM with 2G components from a GMM with G 
@@ -179,6 +186,13 @@ def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, printDetails=Fal
         gmm = [(1.0, vcol(X.mean(1)), covariance_matrix2(X))]
 
     components = len(gmm)
+
+    # Constraining the eigenvalues of the covariance matrices
+    # g[2] is the covariance matrix
+    for g in gmm:
+        U, s, _ = np.linalg.svd(g[2])
+        s[s<psi] = psi
+        g = (g[0], g[1], np.dot(U, vcol(s)*U.T))
 
     if (goal_components == None):
         goal_components = components * 2
@@ -198,7 +212,7 @@ def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, printDetails=Fal
             new_gmm.append((g[0] / 2, g[1] - d, g[2]))
 
         # The 2G components gmm can be used as initial gmm for the EM algorithm
-        gmm = EM_algorithm(X, new_gmm, printDetails)
+        gmm = EM_algorithm(X, new_gmm, psi, printDetails)
         counter += 1
         components *= 2
 
@@ -265,24 +279,24 @@ if __name__ == "__main__":
     # LBG algorithm
 
     # 4D case, check results with solution
-    # print("4D dataset")
-    # LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True)
+    print("4D dataset")
+    LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True)
 
     # # Solution
     # sol_LBG_gmm = load_gmm("data/GMM_4D_4G_EM_LBG.json")
-    # # Check my results with solution
+    # # Check my results with solution: NB: results are correct but not sorted
     # print("My results:")
     # print(LBG_gmm)
     # print("Solution:")
     # print(sol_LBG_gmm)
 
     # 1D case, plot the estimated density
-    print("1D dataset")
-    LBG_gmm1D = LBG_algorithm(X1D, goal_components=4, printDetails=True)
+    # print("1D dataset")
+    # LBG_gmm1D = LBG_algorithm(X1D, goal_components=4, printDetails=True)
     
     # Solution
     # sol_LBG_gmm1D = load_gmm("data/GMM_1D_4G_EM_LBG.json")
-    # # Check my results with solution
+    # # Check my results with solution: NB: results are correct but not sorted
     # print("My results:")
     # print(LBG_gmm1D)
     # print("Solution:")
@@ -292,3 +306,4 @@ if __name__ == "__main__":
     # plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
     # plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), LBG_gmm1D)))
     # plt.show()
+
