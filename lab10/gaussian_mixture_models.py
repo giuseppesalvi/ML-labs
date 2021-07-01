@@ -61,7 +61,7 @@ def logpdf_GMM(X, gmm):
     return logdens
 
 
-def EM_algorithm(X, initial_gmm, psi=0.001, printDetails=False):
+def EM_algorithm(X, initial_gmm, psi=0.01, printDetails=False, version="full"):
     """ Implementation of the GMM EM estimation procediure:
         the EM algorithm is useful to estimate the parameters of a GMM
         that maximize the likelihood for traning set X
@@ -69,6 +69,8 @@ def EM_algorithm(X, initial_gmm, psi=0.001, printDetails=False):
         psi is used to constrain the eigenvalues of covariance matrices 
         in order to avoid degenerate solutions
         printDetails is a boolean, to print iterations of the algorithm or no
+        type can be "full", "diagonal", "tied" to specify which version to use
+        the default is Full covariance
     """
 
     gmm = initial_gmm
@@ -134,18 +136,34 @@ def EM_algorithm(X, initial_gmm, psi=0.001, printDetails=False):
                     np.dot(vcol(X.T[i]), vrow(X.T[i]))
             Sg_list.append(tmp)
 
+        sum_covariances = np.zeros((F,F)) # used for tied covariance version
         # Obtain the new paramters
         for g in range(M):
             w_new = (Zg_list[g] / sum(Zg_list))[0]  # extract the float
             mu_new = vcol(Fg_list[g] / Zg_list[g])
             sigma_new = (Sg_list[g] / Zg_list[g]) - \
                 np.dot(vcol(mu_new), vrow(mu_new))
-            # Constraining the eigenvalues of the covariance matrices to be
-            # larger of equal to psi
-            U, s, _ = np.linalg.svd(sigma_new)
-            s[s<psi] = psi
-            sigma_new = np.dot(U, vcol(s)*U.T)
+
+            # diagonal version
+            if(version == "diagonal"):
+                sigma_new = sigma_new * np.eye(sigma_new.shape[0])
+
+            # tied version
+            if(version == "tied"):
+                sum_covariances += Zg_list[g] * sigma_new
+
             gmm[g] = (w_new, mu_new, sigma_new)
+
+        for g in gmm:
+            if(version == "tied"):
+               g = (g[0], g[1], sum_covariances / N) 
+
+            # Constraining the eigenvalues of the covariance matrices to be
+            # larger or equal to psi
+            U, s, _ = np.linalg.svd(g[2])
+            s[s<psi] = psi
+            g = (g[0], g[1], np.dot(U, vcol(s)*U.T))
+
 
         # Check stopping criterion
         threshold = 1e-6
@@ -174,11 +192,13 @@ def EM_algorithm(X, initial_gmm, psi=0.001, printDetails=False):
 #     return
 
 
-def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.001, printDetails=False):
+def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.01, printDetails=False, version="full"):
     """ Implementation of the LBG algorithm:
         starting from a gmm passed as parameter (or GMM_1  if nothing is passed)
         incrementally constructs a GMM with 2G components from a GMM with G 
         components, we stop when we reach goal components
+        type can be "full", "diagonal", "tied" to specify which version to use
+        the default is Full covariance
     """
 
     if (gmm == None):
@@ -206,13 +226,20 @@ def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.001, print
             print("to obtain n_components = ", components*2, "\n")
         new_gmm = []
         for g in gmm:
+
+            # Constraining the eigenvalues of the covariance matrices
+            # g[2] is the covariance matrix
+            U, s, _ = np.linalg.svd(g[2])
+            s[s<psi] = psi
+            g = (g[0], g[1], np.dot(U, vcol(s)*U.T))
+
             U, s, Vh = np.linalg.svd(g[2])
             d = U[:, 0:1] * s[0] ** 0.5 * alpha
             new_gmm.append((g[0] / 2, g[1] + d, g[2]))
             new_gmm.append((g[0] / 2, g[1] - d, g[2]))
 
         # The 2G components gmm can be used as initial gmm for the EM algorithm
-        gmm = EM_algorithm(X, new_gmm, psi, printDetails)
+        gmm = EM_algorithm(X, new_gmm, psi, printDetails, version)
         counter += 1
         components *= 2
 
@@ -280,7 +307,13 @@ if __name__ == "__main__":
 
     # 4D case, check results with solution
     print("4D dataset")
-    LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True)
+    # print("Full Covariance")
+    # LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True, version="full")
+    # print("Diagonal Covariance")
+    # LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True, version="diagonal")
+    print("Tied Covariance")
+    LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True, version="tied")
+
 
     # # Solution
     # sol_LBG_gmm = load_gmm("data/GMM_4D_4G_EM_LBG.json")
