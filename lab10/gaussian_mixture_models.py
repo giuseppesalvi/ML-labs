@@ -4,7 +4,8 @@ import scipy.special as sps
 import matplotlib.pyplot as plt
 from data.GMM_load import load_gmm
 from modules.gaussian_density_estimation import logpdf_GAU_ND
-from modules.gaussian_density_estimation import GAU_logpdf 
+from modules.pca_lda import covariance_matrix2
+
 
 def vcol(x):
     """ reshape the vector x into a column vector """
@@ -17,9 +18,11 @@ def vrow(x):
 
     return x.reshape(1, x.shape[0])
 
+
 def mcol(x):
-    """ reshape row vector into col vector"""
+    """ reshape row vector into col vector: (1, N) -> (N, 1)"""
     return x.reshape(x.shape[1], 1)
+
 
 def logpdf_GMM(X, gmm):
     """ Computes the log-density of a gmm for a set of samples contained in 
@@ -68,7 +71,7 @@ def EM_algorithm(X, initial_gmm, printDetails=False):
 
     gmm = initial_gmm
     M = len(gmm)
-    F = X.shape[0] # number of features of each sample
+    F = X.shape[0]  # number of features of each sample
     N = X.shape[1]
     stop = False
 
@@ -145,7 +148,7 @@ def EM_algorithm(X, initial_gmm, printDetails=False):
         if (this_avg_ll - previous_avg_ll < threshold):
             stop = True
             if printDetails:
-                print("STOPPING CRITERION MET")
+                print("\nSTOPPING CRITERION MET")
                 print("\nEM algorithm finished\n")
                 print("-"*40)
         else:
@@ -154,14 +157,57 @@ def EM_algorithm(X, initial_gmm, printDetails=False):
 
     return gmm
 
-def plot_gmm(X, gmm):
-    for x in X:
-        plt.figure()
-        plt.hist(np.sort(x), bins=30, density=True)
-        plt.plot(np.sort(x), np.exp(logpdf_GMM(vrow(np.sort(x)), gmm)))
 
-        plt.show()
-    return 
+# def plot_gmm(X, gmm):
+#     for x in X:
+#         plt.figure()
+#         plt.hist(np.sort(x), bins=30, density=True)
+#         plt.plot(np.sort(x), np.exp(logpdf_GMM(vrow(np.sort(x)), gmm)))
+#         plt.show()
+#     return
+
+
+def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, printDetails=False):
+    """ Implementation of the LBG algorithm:
+        starting from a gmm passed as parameter (or GMM_1  if nothing is passed)
+        incrementally constructs a GMM with 2G components from a GMM with G 
+        components, we stop when we reach goal components
+    """
+
+    if (gmm == None):
+        # GMM_1 = [(w, mu, C)] = [(1.0, mu, C)] gaussian density
+        gmm = [(1.0, vcol(X.mean(1)), covariance_matrix2(X))]
+
+    components = len(gmm)
+
+    if (goal_components == None):
+        goal_components = components * 2
+    if (printDetails):
+        print("-"*40)
+        print("\nLBG algorithm starting\n")
+    counter = 1
+    while components < goal_components:
+        if (printDetails):
+            print("\nITERATION ", counter)
+            print("to obtain n_components = ", components*2, "\n")
+        new_gmm = []
+        for g in gmm:
+            U, s, Vh = np.linalg.svd(g[2])
+            d = U[:, 0:1] * s[0] ** 0.5 * alpha
+            new_gmm.append((g[0] / 2, g[1] + d, g[2]))
+            new_gmm.append((g[0] / 2, g[1] - d, g[2]))
+
+        # The 2G components gmm can be used as initial gmm for the EM algorithm
+        gmm = EM_algorithm(X, new_gmm, printDetails)
+        counter += 1
+        components *= 2
+
+    if(printDetails):
+        print("\nLBG algorithm finished\n")
+        print("-"*40)
+
+    return gmm
+
 
 if __name__ == "__main__":
 
@@ -169,9 +215,11 @@ if __name__ == "__main__":
 
     # Load data
     X = np.load("data/GMM_data_4D.npy")
+    X1D = np.load("data/GMM_data_1D.npy")
 
     # Load the reference GMM
     gmm = load_gmm("data/GMM_4D_3G_init.json")
+    gmm1D = load_gmm("data/GMM_1D_3G_init.json")
 
     # Solution log densities for all samples in X
     sol_logdens = np.load("data/GMM_4D_3G_init_ll.npy")
@@ -191,10 +239,12 @@ if __name__ == "__main__":
 
     # GMM estimation: the EM algorithm
 
+    # 4D case, check result with solution
+    # print("4D dataset")
     # EM_gmm = EM_algorithm(X, gmm, printDetails=True)
 
     # Solution
-    sol_EM_gmm = load_gmm("data/GMM_4D_3G_EM.json")
+    # sol_EM_gmm = load_gmm("data/GMM_4D_3G_EM.json")
 
     # Check my results with solution
     # print("My results:")
@@ -202,15 +252,43 @@ if __name__ == "__main__":
     # print("Solution:")
     # print(sol_EM_gmm)
 
-    # 1D case, plot the estimated density 
-    X1D = np.load("data/GMM_data_1D.npy")
-    gmm1D = load_gmm("data/GMM_1D_3G_init.json")
+    # 1D case, plot the estimated density
 
-    EM_gmm1D = EM_algorithm(X1D, gmm1D, printDetails=True)
+    # print("1D dataset")
+    # EM_gmm1D = EM_algorithm(X1D, gmm1D, printDetails=True)
 
+    # plt.figure()
+    # plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
+    # plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), EM_gmm1D)))
+    # plt.show()
 
-    plt.figure()
-    plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
-    plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), EM_gmm1D)))
-    plt.show()
+    # LBG algorithm
 
+    # 4D case, check results with solution
+    # print("4D dataset")
+    # LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True)
+
+    # # Solution
+    # sol_LBG_gmm = load_gmm("data/GMM_4D_4G_EM_LBG.json")
+    # # Check my results with solution
+    # print("My results:")
+    # print(LBG_gmm)
+    # print("Solution:")
+    # print(sol_LBG_gmm)
+
+    # 1D case, plot the estimated density
+    print("1D dataset")
+    LBG_gmm1D = LBG_algorithm(X1D, goal_components=4, printDetails=True)
+    
+    # Solution
+    # sol_LBG_gmm1D = load_gmm("data/GMM_1D_4G_EM_LBG.json")
+    # # Check my results with solution
+    # print("My results:")
+    # print(LBG_gmm1D)
+    # print("Solution:")
+    # print(sol_LBG_gmm1D)
+
+    # plt.figure()
+    # plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
+    # plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), LBG_gmm1D)))
+    # plt.show()
