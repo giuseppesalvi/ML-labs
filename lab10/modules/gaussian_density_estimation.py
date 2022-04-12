@@ -60,6 +60,10 @@ def logpdf_GAU_ND(x, mu, C):
     """Computes the Multivariate Gaussian log density for the dataset x
        C represents the covariance matrix sigma
     """
+
+   
+    
+    """
     # M is the number of rows of x, n of attributes for each sample
     M = x.shape[0]
     if (M == 1):
@@ -70,7 +74,20 @@ def logpdf_GAU_ND(x, mu, C):
         third = -0.5 * np.dot(
             np.dot((x-mu).T, np.linalg.inv(C)), (x - mu))
         return np.diag(first+second+third)
-
+    
+    """
+    """
+    with open("myversion.txt","a") as f:
+        f.write("\n\nINSIDE GAU ND")
+        f.write("X ")
+        f.write(str(x.shape))
+        f.write("mu ")
+        f.write(str(mu.shape))
+        f.write("C ")
+        f.write(str(C.shape))
+    """
+    sigma = C
+    return -(x.shape[0]/2)*np.log(2*np.pi)-(1/2)*(np.linalg.slogdet(sigma)[1])-(1/2)*((np.dot((x-mu).T, np.linalg.inv(sigma))).T*(x-mu)).sum(axis=0)
 
 if __name__ == "__main__":
     # Load the data

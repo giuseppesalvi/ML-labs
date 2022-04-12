@@ -1,10 +1,10 @@
-from matplotlib.pyplot import axis
 import numpy as np
 import scipy.special as sps
-import matplotlib.pyplot as plt
-from data.GMM_load import load_gmm
 from modules.gaussian_density_estimation import logpdf_GAU_ND
 from modules.pca_lda import covariance_matrix2
+import sklearn.datasets as da
+import matplotlib.pyplot as plt
+import json
 
 
 def vcol(x):
@@ -21,7 +21,8 @@ def vrow(x):
 
 def mcol(x):
     """ reshape row vector into col vector: (1, N) -> (N, 1)"""
-    return x.reshape(x.shape[1], 1)
+    # return x.reshape(x.shape[1], 1)
+    return x.reshape((x.size, 1))
 
 
 def logpdf_GMM(X, gmm):
@@ -35,7 +36,6 @@ def logpdf_GMM(X, gmm):
         the result will be an array of shape (N,), whose components will
         contain the log-density for sample xi
     """
-
     M = len(gmm)
     N = X.shape[1]
 
@@ -62,7 +62,7 @@ def logpdf_GMM(X, gmm):
 
 
 def EM_algorithm(X, initial_gmm, psi=0.01, printDetails=False, version="full"):
-    """ Implementation of the GMM EM estimation procediure:
+    """ Implementation of the GMM EM estimation procedure:
         the EM algorithm is useful to estimate the parameters of a GMM
         that maximize the likelihood for traning set X
         The initial estimate of the GMM is passed as parameter
@@ -106,7 +106,6 @@ def EM_algorithm(X, initial_gmm, psi=0.01, printDetails=False, version="full"):
         # Add to each row of S the logarithm of the prior of the corresponding
         # component log w_g
         for g in range(M):  # for g in range(len(gmm)):
-            # gmm[g][0] = w_g
             S[g, :] += np.log(gmm[g][0])
 
         # S is now the matrix of joint densities f_Xi,Gi(xi,g)
@@ -136,7 +135,7 @@ def EM_algorithm(X, initial_gmm, psi=0.01, printDetails=False, version="full"):
                     np.dot(vcol(X.T[i]), vrow(X.T[i]))
             Sg_list.append(tmp)
 
-        sum_covariances = np.zeros((F,F)) # used for tied covariance version
+        sum_covariances = np.zeros((F, F))  # used for tied covariance version
         # Obtain the new paramters
         for g in range(M):
             w_new = (Zg_list[g] / sum(Zg_list))[0]  # extract the float
@@ -152,18 +151,17 @@ def EM_algorithm(X, initial_gmm, psi=0.01, printDetails=False, version="full"):
             if(version == "tied"):
                 sum_covariances += Zg_list[g] * sigma_new
 
+            # Constraining the eigenvalues of the covariance matrices to be
+            # larger or equal to psi
+            U, s, _ = np.linalg.svd(sigma_new)
+            s[s < psi] = psi
+            sigma_new = np.dot(U, vcol(s) * U.T)
+
             gmm[g] = (w_new, mu_new, sigma_new)
 
         for g in gmm:
             if(version == "tied"):
-               g = (g[0], g[1], sum_covariances / N) 
-
-            # Constraining the eigenvalues of the covariance matrices to be
-            # larger or equal to psi
-            U, s, _ = np.linalg.svd(g[2])
-            s[s<psi] = psi
-            g = (g[0], g[1], np.dot(U, vcol(s)*U.T))
-
+                g = (g[0], g[1], sum_covariances / N)
 
         # Check stopping criterion
         threshold = 1e-6
@@ -191,7 +189,6 @@ def EM_algorithm(X, initial_gmm, psi=0.01, printDetails=False, version="full"):
 #         plt.show()
 #     return
 
-
 def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.01, printDetails=False, version="full"):
     """ Implementation of the LBG algorithm:
         starting from a gmm passed as parameter (or GMM_1  if nothing is passed)
@@ -211,7 +208,7 @@ def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.01, printD
     # g[2] is the covariance matrix
     for g in gmm:
         U, s, _ = np.linalg.svd(g[2])
-        s[s<psi] = psi
+        s[s < psi] = psi
         g = (g[0], g[1], np.dot(U, vcol(s)*U.T))
 
     if (goal_components == None):
@@ -230,7 +227,7 @@ def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.01, printD
             # Constraining the eigenvalues of the covariance matrices
             # g[2] is the covariance matrix
             U, s, _ = np.linalg.svd(g[2])
-            s[s<psi] = psi
+            s[s < psi] = psi
             g = (g[0], g[1], np.dot(U, vcol(s)*U.T))
 
             U, s, Vh = np.linalg.svd(g[2])
@@ -248,6 +245,68 @@ def LBG_algorithm(X, gmm=None, goal_components=None, alpha=0.1, psi=0.01, printD
         print("-"*40)
 
     return gmm
+
+
+def load_iris():
+    """ Load iris dataset from the sklearn library
+        Returns the dataset matrix D and matrix of labels L
+    """
+    # We need to transpose the data matrix, since we work with column
+    # representations of feature vectors
+    D, L = da.load_iris()['data'].T, da.load_iris()['target']
+
+    return D, L
+
+
+def split_db_2to1(D, L, seed=0):
+    """ Split the dataset in two parts, one is 2/3, the other is 1/3
+        first part will be used for model training, second part for evaluation
+        D is the dataset, L the corresponding labels
+        returns:
+        DTR = Dataset for training set
+        LTR = Labels for training set
+        DTE = Dataset for test set
+        LTE = Labels for testset
+    """
+    nTrain = int(D.shape[1]*2.0/3.0)
+    np.random.seed(seed)
+    idx = np.random.permutation(D.shape[1])
+    idxTrain = idx[0:nTrain]
+    idxTest = idx[nTrain:]
+
+    DTR = D[:, idxTrain]
+    DTE = D[:, idxTest]
+    LTR = L[idxTrain]
+    LTE = L[idxTest]
+
+    return (DTR, LTR), (DTE, LTE)
+
+
+def GMM_classifier(n_classes, DTR, LTR, DTE, LTE, M, psi, version):
+
+    ld = []
+    # for each class train GMM
+    for i in range(n_classes):
+
+        # keep only samples of ith class
+        DTR_i = DTR[:, LTR == i]
+        # apply LBG algorithm
+        gmm = LBG_algorithm(DTR_i, goal_components=M, psi=psi,
+                            version=version, printDetails=False)
+        ld.append(logpdf_GMM(DTE, gmm))
+    p = np.vstack((ld[0], ld[1], ld[2]))
+    # compute predicted labels
+    predicted = np.argmax(p, axis=0)
+    correct = np.array(predicted == LTE).sum()
+    accuracy = correct / LTE.size
+    error_rate = 1.0 - accuracy
+    return error_rate
+
+
+def load_gmm(filename):
+    with open(filename, 'r') as f:
+        gmm = json.load(f)
+    return [(i, np.asarray(j), np.asarray(k)) for i, j, k in gmm]
 
 
 if __name__ == "__main__":
@@ -275,68 +334,91 @@ if __name__ == "__main__":
     # print(log_dens)
 
     # print("Difference: %f" % (sol_logdens - log_dens).sum())
-    if (sol_logdens - log_dens).sum():
+    if abs((sol_logdens - log_dens).sum()) > 0.00000001:
         print("Error: algorithm of GMM does not work")
 
     # GMM estimation: the EM algorithm
 
     # 4D case, check result with solution
-    # print("4D dataset")
-    # EM_gmm = EM_algorithm(X, gmm, printDetails=True)
+    print("4D dataset")
+    EM_gmm = EM_algorithm(X, gmm, printDetails=True)
 
     # Solution
-    # sol_EM_gmm = load_gmm("data/GMM_4D_3G_EM.json")
+    sol_EM_gmm = load_gmm("data/GMM_4D_3G_EM.json")
 
     # Check my results with solution
-    # print("My results:")
-    # print(EM_gmm)
-    # print("Solution:")
-    # print(sol_EM_gmm)
+    print("My results:")
+    print(EM_gmm)
+    print("Solution:")
+    print(sol_EM_gmm)
 
     # 1D case, plot the estimated density
 
-    # print("1D dataset")
-    # EM_gmm1D = EM_algorithm(X1D, gmm1D, printDetails=True)
+    print("1D dataset")
+    EM_gmm1D = EM_algorithm(X1D, gmm1D, printDetails=True)
 
-    # plt.figure()
-    # plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
-    # plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), EM_gmm1D)))
-    # plt.show()
+    plt.figure()
+    plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
+    plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), EM_gmm1D)))
+    plt.show()
 
     # LBG algorithm
 
     # 4D case, check results with solution
     print("4D dataset")
-    # print("Full Covariance")
-    # LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True, version="full")
-    # print("Diagonal Covariance")
-    # LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True, version="diagonal")
+    print("Full Covariance")
+    LBG_gmm = LBG_algorithm(X, goal_components=4,
+                            printDetails=True, version="full")
+    print("Diagonal Covariance")
+    LBG_gmm = LBG_algorithm(X, goal_components=4,
+                            printDetails=True, version="diagonal")
     print("Tied Covariance")
-    LBG_gmm = LBG_algorithm(X, goal_components=4, printDetails=True, version="tied")
-
+    LBG_gmm = LBG_algorithm(X, goal_components=4,
+                            printDetails=True, version="tied")
 
     # # Solution
-    # sol_LBG_gmm = load_gmm("data/GMM_4D_4G_EM_LBG.json")
-    # # Check my results with solution: NB: results are correct but not sorted
-    # print("My results:")
-    # print(LBG_gmm)
-    # print("Solution:")
-    # print(sol_LBG_gmm)
+    sol_LBG_gmm = load_gmm("data/GMM_4D_4G_EM_LBG.json")
+    # Check my results with solution: NB: results are correct but not sorted
+    print("My results:")
+    print(LBG_gmm)
+    print("Solution:")
+    print(sol_LBG_gmm)
 
     # 1D case, plot the estimated density
-    # print("1D dataset")
-    # LBG_gmm1D = LBG_algorithm(X1D, goal_components=4, printDetails=True)
-    
+    print("1D dataset")
+    LBG_gmm1D = LBG_algorithm(X1D, goal_components=4, printDetails=True)
+
     # Solution
-    # sol_LBG_gmm1D = load_gmm("data/GMM_1D_4G_EM_LBG.json")
-    # # Check my results with solution: NB: results are correct but not sorted
-    # print("My results:")
-    # print(LBG_gmm1D)
-    # print("Solution:")
-    # print(sol_LBG_gmm1D)
+    sol_LBG_gmm1D = load_gmm("data/GMM_1D_4G_EM_LBG.json")
+    # Check my results with solution: NB: results are correct but not sorted
+    print("My results:")
+    print(LBG_gmm1D)
+    print("Solution:")
+    print(sol_LBG_gmm1D)
 
-    # plt.figure()
-    # plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
-    # plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), LBG_gmm1D)))
-    # plt.show()
+    plt.figure()
+    plt.hist(mcol(np.sort(X1D)), bins=30, density=True)
+    plt.plot(mcol(np.sort(X1D)), np.exp(logpdf_GMM(np.sort(X1D), LBG_gmm1D)))
+    plt.show()
 
+    # GMM for Classification
+    print("GMM for classification")
+
+    # Load iris dataset
+    D, L = load_iris()
+    (DTR, LTR), (DTE, LTE) = split_db_2to1(D, L)
+
+    # Full Covariance
+    M_list = [1, 2, 4, 8, 16]
+    psi = 0.01
+
+    versions = ["full", "diagonal", "tied"]
+    for version in versions:
+        error_rates = []
+        for M in M_list:
+            error_rates.append(GMM_classifier(
+                3, DTR, LTR, DTE, LTE, M, psi, version))
+        print("version " + version)
+        for i, M in enumerate(M_list):
+            print("M = %d, error_rate = %f" % (M, error_rates[i] * 100), "%")
+        print("")

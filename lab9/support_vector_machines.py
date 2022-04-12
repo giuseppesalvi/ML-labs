@@ -189,6 +189,9 @@ if __name__ == "__main__":
     c_list = [0, 1]
 
     for c in c_list:
+        bounds = []
+        for i in range(N):
+            bounds.append((0, C))
         for K in K_list:
             svm_dual_kernel = svm_dual_kernel_wrapper(
                 DTR, LTR, polynomial_kernel, K, c, d, 0)

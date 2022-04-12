@@ -49,6 +49,10 @@ def logreg_obj_wrap(DTR, LTR, l):
         w, b = v[0:-1], v[-1]
         z = 2 * LTR - 1
         J = l / 2 * (w * w).sum() + np.log1p(np.exp(-z * (w.T.dot(DTR) + b))).mean()
+
+        # using formula 3
+        # J = l / 2 * (w * w).sum() + (LTR * np.log1p(np.exp(-w.T.dot(DTR) - b)) + (1 - LTR) * np.log1p(np.exp(w.T.dot(DTR) + b))).mean()
+
         return J
 
     return logreg_obj
